@@ -1,0 +1,27 @@
+[package]
+name = "wups"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[features]
+default = []
+panic_handler = []
+macros = []
+
+[lib]
+name = "wups"
+crate-type = ["lib"]
+
+[build-dependencies]
+bindgen = "0.70.1"
+
+[profile]
+dev.panic = "abort"
+release.panic = "abort"
+
+[dependencies]
+wut = { path = "../wut-rs" }
+wups-macros = { path = "./wups-macros" }
+flagset = { version = "0.4.6", default-features = false }
+thiserror = { version = "2.0.3", default-features = false }

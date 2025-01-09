@@ -1,0 +1,15 @@
+#include <wups/meta.h>
+#include <wups/config_api.h>
+#include <wups/wups_debug.h>
+#include <wups/common.h>
+#include <wups/storage.h>
+#include <wups/hooks.h>
+#include <wups/function_patching.h>
+#include <wups/config/WUPSConfigItemMultipleValues.h>
+#include <wups/config/WUPSConfigItemBoolean.h>
+#include <wups/config/WUPSConfigItemStub.h>
+#include <wups/config/WUPSConfigItem.h>
+#include <wups/config/WUPSConfigItemIntegerRange.h>
+#include <wups/config/WUPSConfigCategory.h>
+#include <wups/config.h>
+#include <wups.h>
