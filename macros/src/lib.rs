@@ -22,7 +22,7 @@ pub fn wups_meta(input: TokenStream) -> TokenStream {
         #[no_mangle]
         #[link_section = ".wups.meta"]
         #[allow(non_upper_case_globals)]
-        static #prefixed: &::core::ffi::CStr = unsafe {
+        pub static #prefixed: &::core::ffi::CStr = unsafe {
             core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(
                 stringify!(#name),
                 "=",
@@ -159,7 +159,7 @@ pub fn wups_init_config_functions(_input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn WUPS_PLUGIN_AUTHOR(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string();
+    let input_str = input.to_string().replace("\"", "");
     let meta = quote! {
         author, #input_str
     };
@@ -168,7 +168,7 @@ pub fn WUPS_PLUGIN_AUTHOR(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn WUPS_PLUGIN_VERSION(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string();
+    let input_str = input.to_string().replace("\"", "");
     let meta = quote! {
         version, #input_str
     };
@@ -177,7 +177,7 @@ pub fn WUPS_PLUGIN_VERSION(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string();
+    let input_str = input.to_string().replace("\"", "");
     let meta = quote! {
         license, #input_str
     };
@@ -186,7 +186,7 @@ pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn WUPS_PLUGIN_DESCRIPTION(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string();
+    let input_str = input.to_string().replace("\"", "");
     let meta = quote! {
         description, #input_str
     };
@@ -195,7 +195,7 @@ pub fn WUPS_PLUGIN_DESCRIPTION(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn WUPS_PLUGIN_CONFIG_REVISION(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string();
+    let input_str = input.to_string().replace("\"", "");
     let meta = quote! {
         config_revision, #input_str
     };
@@ -203,12 +203,17 @@ pub fn WUPS_PLUGIN_CONFIG_REVISION(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+pub fn WUPS_USE_WUT_DEVOPTAB(_input: TokenStream) -> TokenStream {
+    wups_hooks(quote! {devoptab}.into())
+}
+
+#[proc_macro]
 pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     let name = input.to_string().replace("\"", "");
-    let wups_version = "0.8.1";
+    let wups_version = "0.8.1"; // TODO: extract from wups::bindings::WUPS_VERSION_STR
     TokenStream::from(quote! {
         wups_meta!(name, #name);
-        wups_meta!(wups, #wups_version); // TODO: extract from wups::bindings::WUPS_VERSION_STR
+        wups_meta!(wups, #wups_version);
         wups_meta!(buildtimestamp, "DATE x TIME");
         use wups::bindings::wups_loader_hook_type_t;
         #[repr(C)]
@@ -245,14 +250,14 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         #[link_section = ".wups.meta"]
         #[allow(non_upper_case_globals)]
         static wups_meta_info_linking_order: &::core::ffi::CStr = unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(
-            "Loading ", #name, "failed.\nFunction\"wut_get_thread_specific\"returned unexpected value.\nPlease check linking order (expected \"-lwups -lwut\")\0"
+            "Loading ", #name, " failed.\nFunction \"wut_get_thread_specific\" returned unexpected value.\nPlease check linking order (expected \"-lwups -lwut\")\0"
         ).as_bytes()) };
     })
 }
 
 #[proc_macro]
 pub fn WUPS_USE_STORAGE(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string();
+    let input_str = input.to_string().replace("\"", "");
     let meta = quote! {
         storage_id, #input_str
     };

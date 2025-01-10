@@ -49,7 +49,7 @@ impl WupsHookInner {
             #[no_mangle]
             #[link_section = ".wups.hooks"]
             #[allow(non_upper_case_globals)]
-            static #static_: WupsLoaderHook = WupsLoaderHook {
+            pub static #static_: WupsLoaderHook = WupsLoaderHook {
                 hook_type: #hook,
                 target: #wrap as *const ()
             };

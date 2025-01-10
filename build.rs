@@ -14,8 +14,8 @@ fn main() {
 
     println!("{link_search_path}={ppc}/powerpc-eabi/lib",);
     println!("{link_search_path}={ppc}/lib/gcc/powerpc-eabi/13.1.0");
-    println!("{link_search_path}={dkp}/wut/lib/");
     println!("{link_search_path}={dkp}/wups/lib/");
+    println!("{link_search_path}={dkp}/wut/lib/");
 
     println!("{link_lib}=wups");
     println!("{link_lib}=wut");
@@ -50,27 +50,8 @@ fn main() {
             &format!("-I{dkp}/wups/include"),
             &format!("-I{dkp}/wut/include"),
             &format!("-I{ppc}/powerpc-eabi/include"),
-            // &format!("-I{ppc}/powerpc-eabi/include/c++/13.1.0"),
-            // &format!("-I{ppc}/powerpc-eabi/include/c++/13.1.0/powerpc-eabi"),
-            // "-Wno-return-type-c-linkage", // ig we can ignore these
         ])
         .allowlist_file(".*/wups/include/.*.h")
-        // we need some extra functions
-        // .header_contents(
-        //     "single_symbols.h",
-        //     r#"
-        //         #pragma once
-        //         #include <unistd.h>
-        //         #include <errno.h>
-        //     "#,
-        // )
-        // .allowlist_function("close")
-        // .allowlist_function("__errno")
-        //
-        // .opaque_type("MEMFrmHeap")
-        // .opaque_type("MEMExpHeap")
-        // .opaque_type("MEMUnitHeap")
-        // .opaque_type("MEMBlockHeap")
         .raw_line("#![allow(non_upper_case_globals)]")
         .raw_line("#![allow(non_camel_case_types)]")
         .raw_line("#![allow(non_snake_case)]")
