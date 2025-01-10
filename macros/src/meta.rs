@@ -6,20 +6,21 @@ use syn::{
 pub struct WupsMeta {
     pub name: Ident,
     pub value: LitStr,
-}
-
-impl WupsMeta {
-    pub fn prefixed(&self) -> Ident {
-        Ident::new(&format!("wups_meta_{}", self.name), self.name.span())
-    }
+    pub prefixed: Ident,
 }
 
 impl Parse for WupsMeta {
     fn parse(input: ParseStream) -> Result<Self> {
-        let name = input.parse()?;
+        let name = input.parse::<Ident>()?;
         _ = input.parse::<Token![,]>()?;
         let value = input.parse()?;
 
-        Ok(Self { name, value })
+        let prefixed = Ident::new(&format!("wups_meta_{}", &name), name.span());
+
+        Ok(Self {
+            name,
+            value,
+            prefixed,
+        })
     }
 }
