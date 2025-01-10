@@ -11,10 +11,5 @@ extern crate wups_macros;
 pub use wups_macros::*;
 
 pub mod bindings;
-pub mod macros;
-
-pub mod prelude {
-    pub use crate::{wups_meta, wups_section};
-}
 
 pub fn wups() {}
