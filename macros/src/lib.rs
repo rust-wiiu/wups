@@ -7,7 +7,7 @@ use hooks::WupsHooks;
 use meta::WupsMeta;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse_macro_input, parse_str, Ident, ItemFn};
 
 #[proc_macro]
 pub fn wups_meta(input: TokenStream) -> TokenStream {
@@ -17,19 +17,20 @@ pub fn wups_meta(input: TokenStream) -> TokenStream {
         prefixed,
     } = parse_macro_input!(input as WupsMeta);
 
+    // Construct the meta string (including null terminator).
+    let meta_str = format!("{}={}\0", name.to_string(), value.value());
+    let meta_bytes = meta_str.as_bytes();
+
+    // Generate a byte array literal.
+    let byte_array = meta_bytes.iter().map(|b| quote! { #b }).collect::<Vec<_>>();
+    let len = meta_bytes.len();
+
     TokenStream::from(quote! {
         #[used]
         #[no_mangle]
         #[link_section = ".wups.meta"]
         #[allow(non_upper_case_globals)]
-        pub static #prefixed: &::core::ffi::CStr = unsafe {
-            core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(
-                stringify!(#name),
-                "=",
-                #value,
-                "\0"
-            ).as_bytes())
-        };
+        pub static #prefixed: [u8; #len] = [#(#byte_array),*];
     })
 }
 
