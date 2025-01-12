@@ -81,7 +81,7 @@ pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
         #[no_mangle]
         #[link_section = ".wups.hooks"]
         #[allow(non_upper_case_globals)]
-        pub static #name: wups::bindings::wups_loader_hook_t = wups::bindings::wups_loader_hook_t {
+        static #name: wups::bindings::wups_loader_hook_t = wups::bindings::wups_loader_hook_t {
             type_: #hook_type,
             target: #hook_target as *const ::core::ffi::c_void
         };
@@ -94,7 +94,7 @@ pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
 pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     let mut stream = TokenStream::new();
 
-    // region: WUPS_META(name, plugin_name)
+    // region: WUPS_META(name, name)
 
     let name = parse_macro_input!(input as syn::LitStr);
     stream.extend(wups_meta(
@@ -152,11 +152,11 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             fn __fini_wut_malloc();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_init_wut_malloc() {
+        unsafe extern "C" fn on_init_wut_malloc() {
             __init_wut_malloc();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_fini_wut_malloc() {
+        unsafe extern "C" fn on_fini_wut_malloc() {
             __fini_wut_malloc();
         }
 
@@ -176,13 +176,13 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             fn __fini_wut_socket();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_init_wut_sockets() {
+        unsafe extern "C" fn on_init_wut_sockets() {
             if __init_wut_socket as *const () != ::core::ptr::null() {
                 __init_wut_socket();
             }
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_fini_wut_sockets() {
+        unsafe extern "C" fn on_fini_wut_sockets() {
             if __fini_wut_socket as *const () != ::core::ptr::null() {
                 __fini_wut_socket();
             }
@@ -202,11 +202,11 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             fn __fini_wut_newlib();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_init_wut_newlib() {
+        unsafe extern "C" fn on_init_wut_newlib() {
             __init_wut_newlib();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_fini_wut_newlib() {
+        unsafe extern "C" fn on_fini_wut_newlib() {
             __fini_wut_newlib();
         }
 
@@ -224,11 +224,11 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             fn __fini_wut_stdcpp();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_init_wut_stdcpp() {
+        unsafe extern "C" fn on_init_wut_stdcpp() {
             __init_wut_stdcpp();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_fini_wut_stdcpp() {
+        unsafe extern "C" fn on_fini_wut_stdcpp() {
             __fini_wut_stdcpp();
         }
 
@@ -245,11 +245,11 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             fn __fini_wut_devoptab();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_init_wut_devoptab() {
+        unsafe extern "C" fn on_init_wut_devoptab() {
             __init_wut_stdcpp();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn on_fini_wut_devoptab() {
+        unsafe extern "C" fn on_fini_wut_devoptab() {
             __fini_wut_stdcpp();
         }
 
@@ -267,14 +267,14 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             fn __fini();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn __init_wrapper() {
+        unsafe extern "C" fn __init_wrapper() {
             if wups::bindings::wut_get_thread_specific(0x13371337) != 0x42424242 {
                 wups::bindings::OSFatal(wups_meta_info_linking_order.as_ptr() as *const _);
             }
             __init();
         }
         #[no_mangle]
-        pub unsafe extern "C" fn __fini_wrapper() {
+        unsafe extern "C" fn __fini_wrapper() {
             __fini();
         }
     }));
@@ -305,7 +305,7 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         }
 
         #[no_mangle]
-        pub unsafe extern "C" fn wups_init_config_functions(args: wups::bindings::wups_loader_init_config_args_t) {
+        unsafe extern "C" fn wups_init_config_functions(args: wups::bindings::wups_loader_init_config_args_t) {
             WUPSConfigAPI_InitLibrary_Internal(args);
         }
 
@@ -325,12 +325,27 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     ));
 
     stream.extend(TokenStream::from(quote! {
-        pub unsafe extern "C" fn init_storage(args: wups::bindings::wups_loader_init_storage_args_t_) {
+        unsafe extern "C" fn init_storage(args: wups::bindings::wups_loader_init_storage_args_t_) {
             let _ = wups::bindings::WUPSStorageAPI_InitInternal(args);
         }
 
         wups_hook_ex!(INIT_STORAGE, init_storage);
 
+    }));
+
+    // endregion
+
+    // region: wups_meta_plugin_name
+
+    let plugin_name = syn::LitByteStr::new(format!("{}\0", name.value()).as_bytes(), name.span());
+    let len = plugin_name.value().len();
+
+    stream.extend(TokenStream::from(quote! {
+        #[used]
+        #[no_mangle]
+        #[link_section = ".wups.meta"]
+        #[allow(non_upper_case_globals)]
+        pub static wups_meta_plugin_name: [u8; #len] = *#plugin_name;
     }));
 
     // endregion
@@ -431,7 +446,7 @@ pub fn on_initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
@@ -448,7 +463,7 @@ pub fn on_deinitialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
@@ -465,7 +480,7 @@ pub fn on_application_start(_attr: TokenStream, item: TokenStream) -> TokenStrea
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
@@ -482,7 +497,7 @@ pub fn on_release_foreground(_attr: TokenStream, item: TokenStream) -> TokenStre
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
@@ -499,7 +514,7 @@ pub fn on_acquired_foreground(_attr: TokenStream, item: TokenStream) -> TokenStr
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
@@ -516,7 +531,7 @@ pub fn on_application_request_exit(_attr: TokenStream, item: TokenStream) -> Tok
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
@@ -533,7 +548,7 @@ pub fn on_application_exit(_attr: TokenStream, item: TokenStream) -> TokenStream
 
     TokenStream::from(quote! {
         #[no_mangle]
-        pub extern "C" fn #func() {
+        extern "C" fn #func() {
             #block
         }
 
