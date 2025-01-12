@@ -159,21 +159,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub unsafe extern "C" fn on_fini_wut_malloc() {
             __fini_wut_malloc();
         }
+
+        wups_hook_ex!(INIT_WUT_MALLOC, on_init_wut_malloc);
+        wups_hook_ex!(FINI_WUT_MALLOC, on_fini_wut_malloc);
     }));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_WUT_MALLOC, on_init_wut_malloc
-        }
-        .into(),
-    ));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            FINI_WUT_MALLOC, on_fini_wut_malloc
-        }
-        .into(),
-    ));
 
     // endregion
 
@@ -198,21 +187,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
                 __fini_wut_socket();
             }
         }
+
+        wups_hook_ex!(INIT_WUT_SOCKETS, on_init_wut_sockets);
+        wups_hook_ex!(FINI_WUT_SOCKETS, on_fini_wut_sockets);
     }));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_WUT_SOCKETS, on_init_wut_sockets
-        }
-        .into(),
-    ));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            FINI_WUT_SOCKETS, on_fini_wut_sockets
-        }
-        .into(),
-    ));
 
     // endregion
 
@@ -231,21 +209,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub unsafe extern "C" fn on_fini_wut_newlib() {
             __fini_wut_newlib();
         }
+
+        wups_hook_ex!(INIT_WUT_NEWLIB, on_init_wut_newlib);
+        wups_hook_ex!(FINI_WUT_NEWLIB, on_fini_wut_newlib);
     }));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_WUT_NEWLIB, on_init_wut_newlib
-        }
-        .into(),
-    ));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            FINI_WUT_NEWLIB, on_fini_wut_newlib
-        }
-        .into(),
-    ));
 
     // endregion
 
@@ -264,22 +231,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub unsafe extern "C" fn on_fini_wut_stdcpp() {
             __fini_wut_stdcpp();
         }
+
+        wups_hook_ex!(INIT_WUT_STDCPP, on_init_wut_stdcpp);
+        wups_hook_ex!(FINI_WUT_STDCPP, on_fini_wut_stdcpp);
     }));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_WUT_STDCPP, on_init_wut_stdcpp
-        }
-        .into(),
-    ));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            FINI_WUT_STDCPP, on_fini_wut_stdcpp
-        }
-        .into(),
-    ));
-
     // endregion
 
     // region: WUPS_USE_WUT_DEVOPTAB
@@ -297,21 +252,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub unsafe extern "C" fn on_fini_wut_devoptab() {
             __fini_wut_stdcpp();
         }
+
+        wups_hook_ex!(INIT_WUT_DEVOPTAB, on_init_wut_devoptab);
+        wups_hook_ex!(FINI_WUT_DEVOPTAB, on_fini_wut_devoptab);
     }));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_WUT_DEVOPTAB, on_init_wut_devoptab
-        }
-        .into(),
-    ));
-
-    stream.extend(wups_hook_ex(
-        quote! {
-            FINI_WUT_DEVOPTAB, on_fini_wut_devoptab
-        }
-        .into(),
-    ));
 
     // endregion
 
@@ -364,14 +308,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub unsafe extern "C" fn wups_init_config_functions(args: wups::bindings::wups_loader_init_config_args_t) {
             WUPSConfigAPI_InitLibrary_Internal(args);
         }
-    }));
 
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_CONFIG, wups_init_config_functions
-        }
-        .into(),
-    ));
+        wups_hook_ex!(INIT_CONFIG, wups_init_config_functions);
+
+    }));
 
     // endregion
 
@@ -388,14 +328,10 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub unsafe extern "C" fn init_storage(args: wups::bindings::wups_loader_init_storage_args_t_) {
             let _ = wups::bindings::WUPSStorageAPI_InitInternal(args);
         }
-    }));
 
-    stream.extend(wups_hook_ex(
-        quote! {
-            INIT_STORAGE, init_storage
-        }
-        .into(),
-    ));
+        wups_hook_ex!(INIT_STORAGE, init_storage);
+
+    }));
 
     // endregion
 
@@ -486,16 +422,6 @@ pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
     )
 }
 
-#[proc_macro]
-pub fn WUPS_USE_WUT_DEVOPTAB(input: TokenStream) -> TokenStream {
-    todo!()
-}
-
-#[proc_macro]
-pub fn WUPS_USE_STORAGE(input: TokenStream) -> TokenStream {
-    todo!()
-}
-
 #[proc_macro_attribute]
 pub fn on_initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as syn::ItemFn);
@@ -509,36 +435,108 @@ pub fn on_initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #block
         }
 
-        wups_hook_ex!(WUPS_LOADER_HOOK_INIT_PLUGIN, #func);
+        wups_hook_ex!(INIT_PLUGIN, #func);
     })
 }
 
 #[proc_macro_attribute]
 pub fn on_deinitialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    todo!()
+    let input = parse_macro_input!(item as syn::ItemFn);
+
+    let func = &input.sig.ident;
+    let block = &input.block;
+
+    TokenStream::from(quote! {
+        #[no_mangle]
+        pub extern "C" fn #func() {
+            #block
+        }
+
+        wups_hook_ex!(DEINIT_PLUGIN, #func);
+    })
 }
 
 #[proc_macro_attribute]
 pub fn on_application_start(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    todo!()
+    let input = parse_macro_input!(item as syn::ItemFn);
+
+    let func = &input.sig.ident;
+    let block = &input.block;
+
+    TokenStream::from(quote! {
+        #[no_mangle]
+        pub extern "C" fn #func() {
+            #block
+        }
+
+        wups_hook_ex!(APPLICATION_STARTS, #func);
+    })
 }
 
 #[proc_macro_attribute]
 pub fn on_release_foreground(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    todo!()
+    let input = parse_macro_input!(item as syn::ItemFn);
+
+    let func = &input.sig.ident;
+    let block = &input.block;
+
+    TokenStream::from(quote! {
+        #[no_mangle]
+        pub extern "C" fn #func() {
+            #block
+        }
+
+        wups_hook_ex!(RELEASE_FOREGROUND, #func);
+    })
 }
 
 #[proc_macro_attribute]
 pub fn on_acquired_foreground(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    todo!()
+    let input = parse_macro_input!(item as syn::ItemFn);
+
+    let func = &input.sig.ident;
+    let block = &input.block;
+
+    TokenStream::from(quote! {
+        #[no_mangle]
+        pub extern "C" fn #func() {
+            #block
+        }
+
+        wups_hook_ex!(ACQUIRED_FOREGROUND, #func);
+    })
 }
 
 #[proc_macro_attribute]
 pub fn on_application_request_exit(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    todo!()
+    let input = parse_macro_input!(item as syn::ItemFn);
+
+    let func = &input.sig.ident;
+    let block = &input.block;
+
+    TokenStream::from(quote! {
+        #[no_mangle]
+        pub extern "C" fn #func() {
+            #block
+        }
+
+        wups_hook_ex!(APPLICATION_REQUESTS_EXIT, #func);
+    })
 }
 
 #[proc_macro_attribute]
 pub fn on_application_exit(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    todo!()
+    let input = parse_macro_input!(item as syn::ItemFn);
+
+    let func = &input.sig.ident;
+    let block = &input.block;
+
+    TokenStream::from(quote! {
+        #[no_mangle]
+        pub extern "C" fn #func() {
+            #block
+        }
+
+        wups_hook_ex!(APPLICATION_ENDS, #func);
+    })
 }
