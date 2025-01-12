@@ -2,12 +2,14 @@
 name = "wups-macros"
 version = "0.1.0"
 edition = "2021"
+authors = ["29th-Day"]
 
 [lib]
 proc-macro = true
 name = "wups_macros"
 
 [dependencies]
+chrono = "0.4.39"
 proc-macro2 = "1.0.92"
 quote = "1.0.38"
 syn = { version = "2.0.95", features = ["full", "derive"] }

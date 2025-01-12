@@ -1,58 +1,189 @@
 #![allow(non_snake_case)]
 
-mod hooks;
-mod meta;
-
-use hooks::WupsHooks;
-use meta::WupsMeta;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, parse_str, Ident, ItemFn};
+use syn::parse_macro_input;
+
+// region: wups_meta
+
+struct Meta {
+    name: syn::Ident,
+    value: syn::LitStr,
+}
+
+impl syn::parse::Parse for Meta {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let name = input.parse()?;
+        _ = input.parse::<syn::Token![,]>()?;
+        let value = input.parse()?;
+        Ok(Self { name, value })
+    }
+}
 
 #[proc_macro]
 pub fn wups_meta(input: TokenStream) -> TokenStream {
-    let WupsMeta {
-        name,
-        value,
-        prefixed,
-    } = parse_macro_input!(input as WupsMeta);
+    let Meta { name, value } = parse_macro_input!(input as Meta);
 
-    // Construct the meta string (including null terminator).
-    let meta_str = format!("{}={}\0", name.to_string(), value.value());
-    let meta_bytes = meta_str.as_bytes();
-
-    // Generate a byte array literal.
-    let byte_array = meta_bytes.iter().map(|b| quote! { #b }).collect::<Vec<_>>();
-    let len = meta_bytes.len();
+    let value = syn::LitByteStr::new(
+        format!("{}={}\0", name.to_string(), value.value()).as_bytes(),
+        value.span(),
+    );
+    let len = value.value().len();
+    let name = syn::Ident::new(&format!("wups_meta_{}", name.to_string()), name.span());
 
     TokenStream::from(quote! {
         #[used]
         #[no_mangle]
         #[link_section = ".wups.meta"]
         #[allow(non_upper_case_globals)]
-        pub static #prefixed: [u8; #len] = [#(#byte_array),*];
+        static #name: [u8; #len] = *#value;
     })
 }
 
-#[proc_macro]
-pub fn wups_hooks(input: TokenStream) -> TokenStream {
-    let m = parse_macro_input!(input as WupsHooks);
+// endregion
 
-    let mut result = TokenStream::new();
+// region: wups_hook_ex
 
-    result.extend(m.init.to_tokens());
-    result.extend(m.fini.to_tokens());
+struct Hook {
+    hook_type: syn::Ident,
+    hook_target: syn::Ident,
+}
 
-    result
+impl syn::parse::Parse for Hook {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let hook_type = input.parse()?;
+        _ = input.parse::<syn::Token![,]>()?;
+        let hook_target = input.parse()?;
+        Ok(Self {
+            hook_type,
+            hook_target,
+        })
+    }
 }
 
 #[proc_macro]
-pub fn wups_socket_hooks(_input: TokenStream) -> TokenStream {
+pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
+    let Hook {
+        hook_type,
+        hook_target,
+    } = parse_macro_input!(input as Hook);
+
+    let hook_type: syn::ExprPath = syn::parse_str(&format!(
+        "wups::bindings::wups_loader_hook_type_t::WUPS_LOADER_HOOK_{}",
+        hook_type.to_string()
+    ))
+    .unwrap();
+
+    let name = syn::Ident::new(&format!("wups_hooks_{}", hook_target), hook_target.span());
+
     TokenStream::from(quote! {
+        #[used]
+        #[no_mangle]
+        #[link_section = ".wups.hooks"]
+        #[allow(non_upper_case_globals)]
+        pub static #name: wups::bindings::wups_loader_hook_t = wups::bindings::wups_loader_hook_t {
+            type_: #hook_type,
+            target: #hook_target as *const ::core::ffi::c_void
+        };
+    })
+}
+
+// endregion
+
+#[proc_macro]
+pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
+    let mut stream = TokenStream::new();
+
+    // region: WUPS_META(name, plugin_name)
+
+    let name = parse_macro_input!(input as syn::LitStr);
+    stream.extend(wups_meta(
+        quote! {
+            name, #name
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_META(wups, WUPS_VERSION_STR)
+
+    stream.extend(TokenStream::from(quote! {
+        #[used]
+        #[no_mangle]
+        #[link_section = ".wups.meta"]
+        #[allow(non_upper_case_globals)]
+        static wups_meta_wups: [u8; wups::bindings::WUPS_VERSION_STR.to_bytes_with_nul().len()] = {
+            let bytes = wups::bindings::WUPS_VERSION_STR.to_bytes_with_nul();
+            const N: usize = wups::bindings::WUPS_VERSION_STR.to_bytes_with_nul().len();
+            let mut array = [0u8; N];
+            let mut i = 0;
+            while i < N {
+                array[i] = bytes[i];
+                i += 1;
+            }
+            array
+        };
+    }));
+
+    // endregion
+
+    // region: WUPS_META(buildtimestamp, ...)
+
+    let now = chrono::Utc::now();
+
+    // format as: "Feb 12 1996 23:59:01"
+    let buildtimestamp = now.format("%b %d %Y %H:%M:%S").to_string();
+
+    stream.extend(wups_meta(
+        quote! {
+            buildtimestamp, #buildtimestamp
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_USE_WUT_MALLOC
+
+    stream.extend(TokenStream::from(quote! {
         extern "C" {
-            // #[linkage = "extern_weak"]
+            fn __init_wut_malloc();
+            fn __fini_wut_malloc();
+        }
+        #[no_mangle]
+        pub unsafe extern "C" fn on_init_wut_malloc() {
+            __init_wut_malloc();
+        }
+        #[no_mangle]
+        pub unsafe extern "C" fn on_fini_wut_malloc() {
+            __fini_wut_malloc();
+        }
+    }));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_WUT_MALLOC, on_init_wut_malloc
+        }
+        .into(),
+    ));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            FINI_WUT_MALLOC, on_fini_wut_malloc
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_USE_WUT_SOCKETS
+
+    stream.extend(TokenStream::from(quote! {
+        extern "C" {
+            // #[linkage="weak"]
             fn __init_wut_socket();
-            // #[linkage = "extern_weak"]
+            // #[linkage="weak"]
             fn __fini_wut_socket();
         }
         #[no_mangle]
@@ -67,227 +198,307 @@ pub fn wups_socket_hooks(_input: TokenStream) -> TokenStream {
                 __fini_wut_socket();
             }
         }
+    }));
 
-        #[used]
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_WUT_SOCKETS, on_init_wut_sockets
+        }
+        .into(),
+    ));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            FINI_WUT_SOCKETS, on_fini_wut_sockets
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_USE_WUT_NEWLIB
+
+    stream.extend(TokenStream::from(quote! {
+        extern "C" {
+            fn __init_wut_newlib();
+            fn __fini_wut_newlib();
+        }
         #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks_on_init_wut_sockets: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_INIT_WUT_SOCKETS,
-            target: on_init_wut_sockets as *const ()
-        };
-
-        #[used]
+        pub unsafe extern "C" fn on_init_wut_newlib() {
+            __init_wut_newlib();
+        }
         #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks_on_fini_wut_sockets: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_FINI_WUT_SOCKETS,
-            target: on_fini_wut_sockets as *const ()
-        };
-    })
-}
+        pub unsafe extern "C" fn on_fini_wut_newlib() {
+            __fini_wut_newlib();
+        }
+    }));
 
-#[proc_macro]
-pub fn wups_init_hooks(_input: TokenStream) -> TokenStream {
-    TokenStream::from(quote! {
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_WUT_NEWLIB, on_init_wut_newlib
+        }
+        .into(),
+    ));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            FINI_WUT_NEWLIB, on_fini_wut_newlib
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_USE_WUT_STDCPP
+
+    stream.extend(TokenStream::from(quote! {
+        extern "C" {
+            fn __init_wut_stdcpp();
+            fn __fini_wut_stdcpp();
+        }
+        #[no_mangle]
+        pub unsafe extern "C" fn on_init_wut_stdcpp() {
+            __init_wut_stdcpp();
+        }
+        #[no_mangle]
+        pub unsafe extern "C" fn on_fini_wut_stdcpp() {
+            __fini_wut_stdcpp();
+        }
+    }));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_WUT_STDCPP, on_init_wut_stdcpp
+        }
+        .into(),
+    ));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            FINI_WUT_STDCPP, on_fini_wut_stdcpp
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_USE_WUT_DEVOPTAB
+
+    stream.extend(TokenStream::from(quote! {
+        extern "C" {
+            fn __init_wut_devoptab();
+            fn __fini_wut_devoptab();
+        }
+        #[no_mangle]
+        pub unsafe extern "C" fn on_init_wut_devoptab() {
+            __init_wut_stdcpp();
+        }
+        #[no_mangle]
+        pub unsafe extern "C" fn on_fini_wut_devoptab() {
+            __fini_wut_stdcpp();
+        }
+    }));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_WUT_DEVOPTAB, on_init_wut_devoptab
+        }
+        .into(),
+    ));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            FINI_WUT_DEVOPTAB, on_fini_wut_devoptab
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS___INIT_WRAPPER & WUPS___FINI_WRAPPER
+
+    stream.extend(TokenStream::from(quote! {
         extern "C" {
             fn __init();
+            fn __fini();
         }
         #[no_mangle]
         pub unsafe extern "C" fn __init_wrapper() {
-            if (wups::bindings::wut_get_thread_specific(0x13371337) != 0x42424242) {
-                wups::bindings::OSFatal(wups::bindings::wups_meta_info_linking_order.as_ptr());
+            if wups::bindings::wut_get_thread_specific(0x13371337) != 0x42424242 {
+                wups::bindings::OSFatal(wups_meta_info_linking_order.as_ptr() as *const _);
             }
             __init();
-        }
-
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks___init_wrapper: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_INIT_WRAPPER,
-            target: __init_wrapper as *const ()
-        };
-    })
-}
-
-#[proc_macro]
-pub fn wups_fini_hooks(_input: TokenStream) -> TokenStream {
-    TokenStream::from(quote! {
-        extern "C" {
-            fn __fini();
         }
         #[no_mangle]
         pub unsafe extern "C" fn __fini_wrapper() {
             __fini();
         }
+    }));
 
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks___fini_wrapper: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_FINI_WRAPPER,
-            target: __fini_wrapper as *const ()
-        };
-    })
-}
-
-#[proc_macro]
-pub fn wups_init_config_functions(_input: TokenStream) -> TokenStream {
-    TokenStream::from(quote! {
-        use wups::bindings::WUPSConfigAPIStatus;
-        extern "C" {
-            fn WUPSConfigAPI_InitLibrary_Internal(args: wups::bindings::wups_loader_init_config_args_t) -> WUPSConfigAPIStatus::Type;
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_WRAPPER, __init_wrapper
         }
+        .into(),
+    ));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            FINI_WRAPPER, __fini_wrapper
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: WUPS_INIT_CONFIG_FUNCTIONS
+
+    stream.extend(TokenStream::from(quote! {
+        extern "C" {
+            fn WUPSConfigAPI_InitLibrary_Internal(
+                args: wups::bindings::wups_loader_init_config_args_t,
+            ) -> wups::bindings::WUPSConfigAPIStatus::Type;
+        }
+
         #[no_mangle]
         pub unsafe extern "C" fn wups_init_config_functions(args: wups::bindings::wups_loader_init_config_args_t) {
             WUPSConfigAPI_InitLibrary_Internal(args);
         }
+    }));
 
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks_wups_init_config_functions: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_INIT_CONFIG,
-            target: wups_init_config_functions as *const ()
-        };
-    })
-}
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_CONFIG, wups_init_config_functions
+        }
+        .into(),
+    ));
 
-#[proc_macro]
-pub fn WUPS_PLUGIN_AUTHOR(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string().replace("\"", "");
-    let meta = quote! {
-        author, #input_str
-    };
-    wups_meta(meta.into())
-}
+    // endregion
 
-#[proc_macro]
-pub fn WUPS_PLUGIN_VERSION(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string().replace("\"", "");
-    let meta = quote! {
-        version, #input_str
-    };
-    wups_meta(meta.into())
-}
+    // region: WUPS_USE_STORAGE
 
-#[proc_macro]
-pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string().replace("\"", "");
-    let meta = quote! {
-        license, #input_str
-    };
-    wups_meta(meta.into())
+    stream.extend(wups_meta(
+        quote! {
+            storage_id, #name
+        }
+        .into(),
+    ));
+
+    stream.extend(TokenStream::from(quote! {
+        pub unsafe extern "C" fn init_storage(args: wups::bindings::wups_loader_init_storage_args_t_) {
+            let _ = wups::bindings::WUPSStorageAPI_InitInternal(args);
+        }
+    }));
+
+    stream.extend(wups_hook_ex(
+        quote! {
+            INIT_STORAGE, init_storage
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: wups_meta_info_dump
+
+    let info_dump = syn::LitStr::new(
+        &format!(
+            "(plugin: {}; wups: {}; buildtime: {})",
+            name.value(),
+            "0.8.1", // wups::bindings::WUPS_VERSION_STR (idk how to extract here)
+            buildtimestamp
+        ),
+        name.span(),
+    );
+
+    stream.extend(wups_meta(
+        quote! {
+            info_dump, #info_dump
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    // region: wups_meta_info_linking_order
+
+    let linking_order = syn::LitStr::new(
+        &format!(
+            "Loading \"{}\" failed.\nFunction \"wut_get_thread_specific\" returned unexpected value.\nPlease check linking order (expected \"-lwups -lwut\")",
+            name.value()
+        ),
+        name.span(),
+    );
+
+    stream.extend(wups_meta(
+        quote! {
+            info_linking_order, #linking_order
+        }
+        .into(),
+    ));
+
+    // endregion
+
+    stream
 }
 
 #[proc_macro]
 pub fn WUPS_PLUGIN_DESCRIPTION(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string().replace("\"", "");
-    let meta = quote! {
-        description, #input_str
-    };
-    wups_meta(meta.into())
-}
-
-#[proc_macro]
-pub fn WUPS_PLUGIN_CONFIG_REVISION(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string().replace("\"", "");
-    let meta = quote! {
-        config_revision, #input_str
-    };
-    wups_meta(meta.into())
-}
-
-#[proc_macro]
-pub fn WUPS_USE_WUT_DEVOPTAB(_input: TokenStream) -> TokenStream {
-    wups_hooks(quote! {devoptab}.into())
-}
-
-#[proc_macro]
-pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
-    let name = input.to_string().replace("\"", "");
-    let wups_version = "0.8.1"; // TODO: extract from wups::bindings::WUPS_VERSION_STR
-    TokenStream::from(quote! {
-        wups_meta!(name, #name);
-        wups_meta!(wups, #wups_version);
-        wups_meta!(buildtimestamp, "DATE x TIME");
-        use wups::bindings::wups_loader_hook_type_t;
-        #[repr(C)]
-        pub struct WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::Type,
-            target: *const (),
+    let value = parse_macro_input!(input as syn::LitStr);
+    wups_meta(
+        quote! {
+            description, #value
         }
-        unsafe impl Sync for WupsLoaderHook {}
-        //
-        wups_hooks!(malloc);
-        wups_hooks!(newlib);
-        wups_hooks!(stdcpp);
-        //
-        wups_socket_hooks!();
-        //
-        wups_init_hooks!();
-        wups_fini_hooks!();
-        wups_init_config_functions!();
-        //
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.meta"]
-        #[allow(non_upper_case_globals)]
-        static wups_meta_plugin_name: &::core::ffi::CStr = unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#name, "\0").as_bytes()) };
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.meta"]
-        #[allow(non_upper_case_globals)]
-        static wups_meta_info_dump: &::core::ffi::CStr = unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(
-            "(plugin: ", #name, ";wups: ", #wups_version, "; buildtime: x)\0"
-        ).as_bytes()) };
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.meta"]
-        #[allow(non_upper_case_globals)]
-        static wups_meta_info_linking_order: &::core::ffi::CStr = unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(
-            "Loading ", #name, " failed.\nFunction \"wut_get_thread_specific\" returned unexpected value.\nPlease check linking order (expected \"-lwups -lwut\")\0"
-        ).as_bytes()) };
-    })
+        .into(),
+    )
+}
+
+#[proc_macro]
+pub fn WUPS_PLUGIN_VERSION(input: TokenStream) -> TokenStream {
+    let value = parse_macro_input!(input as syn::LitStr);
+    wups_meta(
+        quote! {
+            version, #value
+        }
+        .into(),
+    )
+}
+
+#[proc_macro]
+pub fn WUPS_PLUGIN_AUTHOR(input: TokenStream) -> TokenStream {
+    let value = parse_macro_input!(input as syn::LitStr);
+    wups_meta(
+        quote! {
+            author, #value
+        }
+        .into(),
+    )
+}
+
+#[proc_macro]
+pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
+    let value = parse_macro_input!(input as syn::LitStr);
+    wups_meta(
+        quote! {
+            license, #value
+        }
+        .into(),
+    )
+}
+
+#[proc_macro]
+pub fn WUPS_USE_WUT_DEVOPTAB(input: TokenStream) -> TokenStream {
+    todo!()
 }
 
 #[proc_macro]
 pub fn WUPS_USE_STORAGE(input: TokenStream) -> TokenStream {
-    let input_str = input.to_string().replace("\"", "");
-    let meta = quote! {
-        storage_id, #input_str
-    };
-
-    let mut tokens = TokenStream::new();
-
-    tokens.extend(wups_meta(meta.into()));
-    tokens.extend(TokenStream::from(quote! {
-        #[no_mangle]
-        pub unsafe extern "C" fn init_storage(args: wups::bindings::wups_loader_init_storage_args_t) {
-            wups::bindings::WUPSStorageAPI_InitInternal(args);
-        }
-
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks_init_storage: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_INIT_STORAGE,
-            target: init_storage as *const ()
-        };
-    }));
-
-    tokens
+    todo!()
 }
 
 #[proc_macro_attribute]
-pub fn initialize(_attr: TokenStream, input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as ItemFn);
+pub fn on_initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as syn::ItemFn);
 
     let func = &input.sig.ident;
     let block = &input.block;
@@ -298,37 +509,36 @@ pub fn initialize(_attr: TokenStream, input: TokenStream) -> TokenStream {
             #block
         }
 
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks_init_plugin: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_INIT_PLUGIN,
-            target: #func as *const ()
-        };
+        wups_hook_ex!(WUPS_LOADER_HOOK_INIT_PLUGIN, #func);
     })
 }
 
 #[proc_macro_attribute]
-pub fn deinitialize(_attr: TokenStream, input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as ItemFn);
+pub fn on_deinitialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    todo!()
+}
 
-    let func = &input.sig.ident;
-    let block = &input.block;
+#[proc_macro_attribute]
+pub fn on_application_start(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    todo!()
+}
 
-    TokenStream::from(quote! {
-        #[no_mangle]
-        pub extern "C" fn #func() {
-            #block
-        }
+#[proc_macro_attribute]
+pub fn on_release_foreground(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    todo!()
+}
 
-        #[used]
-        #[no_mangle]
-        #[link_section = ".wups.hooks"]
-        #[allow(non_upper_case_globals)]
-        static wups_hooks_deinit_plugin: WupsLoaderHook = WupsLoaderHook {
-            hook_type: wups_loader_hook_type_t::WUPS_LOADER_HOOK_DEINIT_PLUGIN,
-            target: #func as *const ()
-        };
-    })
+#[proc_macro_attribute]
+pub fn on_acquired_foreground(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    todo!()
+}
+
+#[proc_macro_attribute]
+pub fn on_application_request_exit(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    todo!()
+}
+
+#[proc_macro_attribute]
+pub fn on_application_exit(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    todo!()
 }
