@@ -348,6 +348,11 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
         pub static wups_meta_plugin_name: [u8; #len] = *#plugin_name;
     }));
 
+    let plugin_name = syn::LitStr::new(name.value().as_str(), name.span());
+    stream.extend(TokenStream::from(quote! {
+        pub static PLUGIN_NAME: &str = #plugin_name;
+    }));
+
     // endregion
 
     // region: wups_meta_info_dump
@@ -553,5 +558,157 @@ pub fn on_application_exit(_attr: TokenStream, item: TokenStream) -> TokenStream
         }
 
         wups_hook_ex!(APPLICATION_ENDS, #func);
+    })
+}
+
+#[proc_macro_derive(Config)]
+pub fn config_derive_macro(item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::DeriveInput);
+
+    let name = item.ident;
+    // get all fields, types and values from the struct
+    let fields = match item.data {
+        syn::Data::Struct(data) => match data.fields {
+            syn::Fields::Named(fields) => fields.named,
+            _ => panic!("This derive macro only works on structs with named fields"),
+        },
+        _ => panic!("This derive macro only works on structs"),
+    };
+
+    const MAX_LEN: usize = 256 + 1;
+
+    fn type_to_wups(type_: &syn::Type) -> &str {
+        match quote!(#type_).to_string().as_str() {
+            "u32" => "WUPS_STORAGE_ITEM_U32",
+            "u64" => "WUPS_STORAGE_ITEM_U64",
+            "i32" => "WUPS_STORAGE_ITEM_S32",
+            "i64" => "WUPS_STORAGE_ITEM_S64",
+            "String" => "WUPS_STORAGE_ITEM_STRING",
+            "bool" => "WUPS_STORAGE_ITEM_BOOL",
+            "f32" => "WUPS_STORAGE_ITEM_FLOAT",
+            "f64" => "WUPS_STORAGE_ITEM_DOUBLE",
+            _ => panic!("Unsupported type: {}", quote!(#type_).to_string()),
+        }
+    }
+
+    let load_fields = fields.iter().map(|field| {
+        //
+        let name = field.ident.as_ref().unwrap();
+        let name_str =
+            syn::LitByteStr::new(format!("{}\0", name.to_string()).as_bytes(), name.span());
+        let type_ = &field.ty;
+        let storage_id = syn::Ident::new(type_to_wups(type_), name.span());
+
+        if quote!(#type_).to_string() != "String" {
+            quote! {
+                let mut #name = Default::default();
+                let status = unsafe {
+                    let mut out = 0;
+                    let status = wups::bindings::WUPSStorageAPI_GetItem(
+                        core::ptr::null_mut(),
+                        #name_str.as_ptr() as *const _,
+                        wups::bindings::WUPSStorageItemTypes::#storage_id,
+                        &mut #name as *mut _ as *mut ::core::ffi::c_void,
+                        ::core::mem::size_of::<#type_>() as u32,
+                        &mut out
+                    );
+                    if out != core::mem::size_of::<#type_>() as u32 {
+                        -42
+                    } else {
+                        status
+                    }
+                };
+                wups::config::ConfigError::try_from(status)?;
+            }
+        } else {
+            quote! {
+                let mut buffer: [u8; #MAX_LEN] = [0; #MAX_LEN];
+                let mut out = 0;
+                let status = unsafe {
+                    let status = wups::bindings::WUPSStorageAPI_GetItem(
+                        core::ptr::null_mut(),
+                        #name_str.as_ptr() as *const _,
+                        wups::bindings::WUPSStorageItemTypes::#storage_id,
+                        &mut buffer as *mut _ as *mut ::core::ffi::c_void,
+                        (#MAX_LEN - 1) as u32,
+                        &mut out
+                    );
+                    if out > (#MAX_LEN - 1) as u32 {
+                        -69
+                    } else {
+                        status
+                    }
+                };
+                wups::config::ConfigError::try_from(status)?;
+                let #name = String::from_utf8_lossy(&buffer[..out as usize]).to_string();
+            }
+        }
+    });
+
+    let save_fields = fields.iter().map(|field| {
+        //
+        let name = field.ident.as_ref().unwrap();
+        let name_str =
+            syn::LitByteStr::new(format!("{}\0", name.to_string()).as_bytes(), name.span());
+        let type_ = &field.ty;
+        let storage_id = syn::Ident::new(type_to_wups(type_), name.span());
+
+        if quote!(#type_).to_string() != "String" {
+            quote! {
+                let mut #name = self.#name;
+                let status = unsafe {
+                    wups::bindings::WUPSStorageAPI_StoreItem(
+                        core::ptr::null_mut(),
+                        #name_str.as_ptr() as *const _,
+                        wups::bindings::WUPSStorageItemTypes::#storage_id,
+                        &mut #name as *mut _ as *mut ::core::ffi::c_void,
+                        ::core::mem::size_of::<#type_>() as u32
+                    )
+                };
+                wups::config::ConfigError::try_from(status)?;
+            }
+        } else {
+            quote! {
+                let mut buffer: [u8; #MAX_LEN] = [0; #MAX_LEN];
+                let bytes = self.#name.as_bytes();
+                let len = ::core::cmp::min(bytes.len(), #MAX_LEN - 1);
+                buffer[..len].copy_from_slice(&bytes[..len]);
+                let status = unsafe {
+                    wups::bindings::WUPSStorageAPI_StoreItem(
+                        core::ptr::null_mut(),
+                        #name_str.as_ptr() as *const _,
+                        wups::bindings::WUPSStorageItemTypes::#storage_id,
+                        &mut buffer as *mut _ as *mut ::core::ffi::c_void,
+                        len as u32
+                    )
+                };
+                wups::config::ConfigError::try_from(status)?;
+            }
+        }
+    });
+
+    let all_fields = fields.iter().map(|field| {
+        let name = field.ident.as_ref().unwrap();
+        quote! {
+            #name
+        }
+    });
+
+    TokenStream::from(quote! {
+        impl wups::config::WupsConfig for #name {
+            type Item = Self;
+            fn load() -> Result<Self::Item, wups::config::ConfigError> {
+                #(#load_fields)*
+
+                Ok(Self { #(#all_fields, )* })
+            }
+
+            fn save(&self) -> Result<(), wups::config::ConfigError> {
+                #(#save_fields)*
+
+                Ok(())
+
+            }
+        }
     })
 }

@@ -11,5 +11,14 @@ extern crate wups_macros;
 pub use wups_macros::*;
 
 pub mod bindings;
+pub mod config;
+pub mod ui;
 
-pub fn wups() {}
+#[cfg(feature = "panic_handler")]
+#[panic_handler]
+fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
+    unsafe {
+        crate::bindings::OSFatal(c"Panic!".as_ptr());
+    }
+    loop {}
+}
