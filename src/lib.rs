@@ -11,14 +11,27 @@ extern crate wups_macros;
 pub use wups_macros::*;
 
 pub mod bindings;
-pub mod config;
+pub mod storage;
 pub mod ui;
 
 #[cfg(feature = "panic_handler")]
 #[panic_handler]
-fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
+fn panic_handler(info: &core::panic::PanicInfo) -> ! {
+    use alloc::format;
+    let msg = if let Some(location) = info.location() {
+        format!(
+            "Panic!\n\n{}\n\n[{} : Ln {}, Col {}]\0",
+            info.message(),
+            location.file(),
+            location.line(),
+            location.column()
+        )
+    } else {
+        format!("Panic!\n\n{}\0", info.message())
+    };
+
     unsafe {
-        crate::bindings::OSFatal(c"Panic!".as_ptr());
+        crate::bindings::OSFatal(msg.as_ptr() as *const _);
     }
     loop {}
 }

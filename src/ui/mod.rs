@@ -4,7 +4,7 @@
 
 pub mod glyphs;
 
-use crate::{bindings as c_wups, config::ConfigError};
+use crate::{bindings as c_wups, storage::StorageError};
 use alloc::{ffi::CString, string::String, vec::Vec};
 use core::ffi::CStr;
 use thiserror::Error;
@@ -102,9 +102,9 @@ impl TryFrom<c_wups::WUPSConfigAPICallbackStatus::Type> for MenuError {
 pub struct MenuUI;
 
 impl MenuUI {
-    pub fn new(ui: MenuItem) -> Result<(), ConfigError> {
+    pub fn new(ui: MenuItem) -> Result<(), StorageError> {
         if MENU_UI.get().is_some() {
-            return Err(ConfigError::MENU_UI_ERROR(MenuError::ALREADY_INITIALIZED));
+            return Err(StorageError::MENU_UI_ERROR(MenuError::ALREADY_INITIALIZED));
         }
 
         if let MenuItem::Root { ref name, .. } = ui {
@@ -119,7 +119,7 @@ impl MenuUI {
             let _ = MENU_UI.set(ui);
             Ok(())
         } else {
-            Err(ConfigError::MENU_UI_ERROR(MenuError::MUST_CONTAIN_ROOT))
+            Err(StorageError::MENU_UI_ERROR(MenuError::MUST_CONTAIN_ROOT))
         }
     }
 }
