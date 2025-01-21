@@ -1,6 +1,65 @@
-/// Storage
-///
-/// Persistent key-value-like datastore.
+//! Storage Module
+//!
+//! This module provides a persistent key-value-like datastore for various data types. It allows
+//! storing, loading, and deleting data with a simple API. The storage supports basic types such as
+//! integers, floats, booleans, strings, and binary data.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use wups::storage::{store, load, load_or_default, delete, reset, reload};
+//!
+//! // Store data
+//! store::<i32>("integer", 42).unwrap();
+//! store::<u64>("big_integer", 420).unwrap();
+//! store::<f32>("float", 3.14).unwrap();
+//! store::<String>("string", "Hello there!".to_string()).unwrap();
+//!
+//! // Load data
+//! assert_eq!(load::<i32>("integer").unwrap(), 42);
+//! assert_eq!(load::<u64>("big_integer").unwrap(), 420);
+//! assert_eq!(load::<f32>("float").unwrap(), 3.14);
+//! assert_eq!(load::<String>("string").unwrap(), "Hello there!".to_string());
+//!
+//! // Load data or return default value
+//! assert_eq!(load_or_default::<i32>("nonexistent"), 0);
+//!
+//! // Delete data
+//! delete("integer").unwrap();
+//!
+//! // Reset storage (wipe all data)
+//! reset().unwrap();
+//!
+//! // Reload storage
+//! reload().unwrap();
+//! ```
+//!
+//! # Errors
+//!
+//! The module defines a `StorageError` enum to represent various errors that can occur during
+//! storage operations. These include invalid arguments, memory allocation failures, unexpected
+//! data types, buffer size issues, I/O errors, and more.
+//!
+//! # Traits
+//!
+//! The `WupsStorage` trait defines the interface for loading and storing data. It is implemented
+//! for various data types, including integers, floats, booleans, strings, and binary data.
+//!
+//! # Constants
+//!
+//! - `STORAGE_MAX_LENGTH`: The maximum length for storage items, set to 1024 bytes.
+//!
+//! # Functions
+//!
+//! - [load][crate::storage::load]: Loads previously saved data
+//!   from storage.
+//! - [load_or_default][crate::storage::load_or_default]: Loads previously saved data from
+//!   storage or returns the default value for the given type.
+//! - [store][crate::storage::store]: Saves data into storage.
+//! - [delete][crate::storage::delete]: Deletes previously saved data from storage.
+//! - [reset][crate::storage::reset]: Wipes the entire storage, deleting all data.
+//! - [reload][crate::storage::reload]: Forces a reload of the storage.
+
 use core::ffi;
 
 use crate::bindings as c_wups;
