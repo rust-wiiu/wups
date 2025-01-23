@@ -1,0 +1,15 @@
+extend = [{ path = "../wut-rs/Makefile.toml" }]
+
+[env]
+LINKER_ARGS = { value = "-C link-arg=-T${DEVKITPRO}/wups/share/wups.ld -C link-arg=-specs=${DEVKITPRO}/wups/share/wups.specs", condition.env = { "CARGO_MAKE_TASK" = "wups" } }
+
+[tasks.wups]
+env = { STRIP = "${TARGET_DIR}/${CARGO_MAKE_PROJECT_NAME}.strip.elf", ELF = "${OUT_FILE}", OUT_FILE = "${TARGET_DIR}/${CARGO_MAKE_PROJECT_NAME}.wps" }
+script = [
+    "cp ${ELF} ${STRIP}",
+    "${DEVKITPPC}/bin/powerpc-eabi-strip -g ${STRIP}",
+    "${DEVKITPRO}/tools/bin/elf2rpl ${STRIP} ${OUT_FILE}",
+    "echo 'PL' | dd of=${OUT_FILE} bs=1 seek=9 count=2 conv=notrunc status=none",
+    "rm ${STRIP}",
+]
+dependencies = ["elf"]

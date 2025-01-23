@@ -22,7 +22,10 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         format!(
             "Panic!\n\n{}\n\n[{} : Ln {}, Col {}]\0",
             info.message(),
-            location.file(),
+            location
+                .file()
+                .strip_prefix("/home/gerald/Projects/Rust/rust-wiiu/")
+                .unwrap_or(location.file()),
             location.line(),
             location.column()
         )

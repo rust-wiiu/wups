@@ -2,7 +2,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
+use syn::{parse_macro_input, spanned::Spanned};
 
 // region: wups_meta
 
@@ -450,121 +450,89 @@ pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
     )
 }
 
-#[proc_macro_attribute]
-pub fn on_initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
+fn generate_proc_macro_attribute(
+    hook_type: &str,
+    attr: TokenStream,
+    item: TokenStream,
+) -> TokenStream {
+    let args =
+        parse_macro_input!(attr with syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
+            .into_iter()
+            .map(|arg| {
+                let path = match arg {
+                    syn::Meta::Path(path) => path,
+                    _ => panic!("Expected: Cafe, Console, Module, Udp"),
+                };
+                let ident = path.get_ident().unwrap();
+                quote! { wut::logger::Channel::#ident }
+            })
+            .collect::<Vec<_>>();
 
+    let input = parse_macro_input!(item as syn::ItemFn);
     let func = &input.sig.ident;
     let block = &input.block;
+
+    let logger_init = if !args.is_empty() {
+        quote! {
+            let _ = wut::logger::init(#(#args),*).expect("logger init failed");
+        }
+    } else {
+        quote! {}
+    };
+
+    let logger_deinit = if !args.is_empty() {
+        quote! {
+            wut::logger::deinit();
+        }
+    } else {
+        quote! {}
+    };
+
+    let hook_type = syn::Ident::new(hook_type, hook_type.span());
 
     TokenStream::from(quote! {
         #[no_mangle]
         extern "C" fn #func() {
+            #logger_init
             #block
+            #logger_deinit
         }
 
-        wups_hook_ex!(INIT_PLUGIN, #func);
+        wups_hook_ex!(#hook_type, #func);
     })
 }
 
 #[proc_macro_attribute]
-pub fn on_deinitialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
-
-    let func = &input.sig.ident;
-    let block = &input.block;
-
-    TokenStream::from(quote! {
-        #[no_mangle]
-        extern "C" fn #func() {
-            #block
-        }
-
-        wups_hook_ex!(DEINIT_PLUGIN, #func);
-    })
+pub fn on_initialize(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("INIT_PLUGIN", attr, item)
 }
 
 #[proc_macro_attribute]
-pub fn on_application_start(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
-
-    let func = &input.sig.ident;
-    let block = &input.block;
-
-    TokenStream::from(quote! {
-        #[no_mangle]
-        extern "C" fn #func() {
-            #block
-        }
-
-        wups_hook_ex!(APPLICATION_STARTS, #func);
-    })
+pub fn on_deinitialize(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("DEINIT_PLUGIN", attr, item)
 }
 
 #[proc_macro_attribute]
-pub fn on_release_foreground(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
-
-    let func = &input.sig.ident;
-    let block = &input.block;
-
-    TokenStream::from(quote! {
-        #[no_mangle]
-        extern "C" fn #func() {
-            #block
-        }
-
-        wups_hook_ex!(RELEASE_FOREGROUND, #func);
-    })
+pub fn on_application_start(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("APPLICATION_STARTS", attr, item)
 }
 
 #[proc_macro_attribute]
-pub fn on_acquired_foreground(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
-
-    let func = &input.sig.ident;
-    let block = &input.block;
-
-    TokenStream::from(quote! {
-        #[no_mangle]
-        extern "C" fn #func() {
-            #block
-        }
-
-        wups_hook_ex!(ACQUIRED_FOREGROUND, #func);
-    })
+pub fn on_release_foreground(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("RELEASE_FOREGROUND", attr, item)
 }
 
 #[proc_macro_attribute]
-pub fn on_application_request_exit(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
-
-    let func = &input.sig.ident;
-    let block = &input.block;
-
-    TokenStream::from(quote! {
-        #[no_mangle]
-        extern "C" fn #func() {
-            #block
-        }
-
-        wups_hook_ex!(APPLICATION_REQUESTS_EXIT, #func);
-    })
+pub fn on_acquired_foreground(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("ACQUIRED_FOREGROUND", attr, item)
 }
 
 #[proc_macro_attribute]
-pub fn on_application_exit(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::ItemFn);
+pub fn on_application_request_exit(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("APPLICATION_REQUESTS_EXIT", attr, item)
+}
 
-    let func = &input.sig.ident;
-    let block = &input.block;
-
-    TokenStream::from(quote! {
-        #[no_mangle]
-        extern "C" fn #func() {
-            #block
-        }
-
-        wups_hook_ex!(APPLICATION_ENDS, #func);
-    })
+#[proc_macro_attribute]
+pub fn on_application_exit(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_proc_macro_attribute("APPLICATION_ENDS", attr, item)
 }
