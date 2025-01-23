@@ -8,7 +8,7 @@ use syn::{parse_macro_input, spanned::Spanned};
 
 struct Meta {
     name: syn::Ident,
-    value: syn::LitStr,
+    value: syn::Expr,
 }
 
 impl syn::parse::Parse for Meta {
@@ -24,8 +24,30 @@ impl syn::parse::Parse for Meta {
 pub fn wups_meta(input: TokenStream) -> TokenStream {
     let Meta { name, value } = parse_macro_input!(input as Meta);
 
+    let value_str = match &value {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(lit_str),
+            ..
+        }) => lit_str.value(),
+        syn::Expr::Macro(syn::ExprMacro { mac, .. }) if mac.path.is_ident("env") => {
+            let tokens = mac.tokens.to_string();
+            let env_var = tokens.trim_matches(|c| c == '(' || c == ')' || c == '"' || c == '\'');
+            std::env::var(env_var).unwrap_or_default()
+        }
+        _ => {
+            let evaluated_value: syn::Lit = syn::parse_quote!(#value);
+            match evaluated_value {
+                syn::Lit::Str(lit_str) => lit_str.value(),
+                syn::Lit::Int(lit_int) => lit_int.base10_digits().to_string(),
+                syn::Lit::Float(lit_float) => lit_float.base10_digits().to_string(),
+                syn::Lit::Bool(lit_bool) => lit_bool.value.to_string(),
+                _ => quote!(#value).to_string(),
+            }
+        }
+    };
+
     let value = syn::LitByteStr::new(
-        format!("{}={}\0", name.to_string(), value.value()).as_bytes(),
+        format!("{}={}\0", name.to_string(), value_str).as_bytes(),
         value.span(),
     );
     let len = value.value().len();
@@ -94,15 +116,19 @@ pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
 pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     let mut stream = TokenStream::new();
 
-    // region: WUPS_META(name, name)
+    // region: WUPS_META name, description, version, license, buildtimestamp
 
     let name = parse_macro_input!(input as syn::LitStr);
-    stream.extend(wups_meta(
-        quote! {
-            name, #name
-        }
-        .into(),
-    ));
+    let buildtimestamp = chrono::Utc::now().format("%b %d %Y %H:%M:%S").to_string(); // format as: "Feb 12 1996 23:59:01"
+
+    stream.extend(TokenStream::from(quote! {
+        wups_meta!(name, #name);
+        wups_meta!(description, env!("CARGO_PKG_DESCRIPTION"));
+        wups_meta!(version, env!("CARGO_PKG_VERSION"));
+        wups_meta!(author, env!("CARGO_PKG_AUTHORS"));
+        wups_meta!(license, env!("CARGO_PKG_LICENSE"));
+        wups_meta!(buildtimestamp, #buildtimestamp);
+    }));
 
     // endregion
 
@@ -130,22 +156,6 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             array
         };
     }));
-
-    // endregion
-
-    // region: WUPS_META(buildtimestamp, ...)
-
-    let now = chrono::Utc::now();
-
-    // format as: "Feb 12 1996 23:59:01"
-    let buildtimestamp = now.format("%b %d %Y %H:%M:%S").to_string();
-
-    stream.extend(wups_meta(
-        quote! {
-            buildtimestamp, #buildtimestamp
-        }
-        .into(),
-    ));
 
     // endregion
 
@@ -406,15 +416,16 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     stream
 }
 
+/*
 #[proc_macro]
 pub fn WUPS_PLUGIN_DESCRIPTION(input: TokenStream) -> TokenStream {
     let value = parse_macro_input!(input as syn::LitStr);
-    wups_meta(
-        quote! {
+
+    TokenStream::from(quote! {
+        wups_meta!(
             description, #value
-        }
-        .into(),
-    )
+        );
+    })
 }
 
 #[proc_macro]
@@ -449,7 +460,7 @@ pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
         .into(),
     )
 }
-
+*/
 fn generate_proc_macro_attribute(
     hook_type: &str,
     attr: TokenStream,

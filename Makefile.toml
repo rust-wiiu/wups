@@ -4,6 +4,11 @@ extend = [{ path = "../wut-rs/Makefile.toml" }]
 LINKER_ARGS = { value = "-C link-arg=-T${DEVKITPRO}/wups/share/wups.ld -C link-arg=-specs=${DEVKITPRO}/wups/share/wups.specs", condition.env = { "CARGO_MAKE_TASK" = "wups" } }
 
 [tasks.wups]
+env = { LINKER_ARGS = "-C link-arg=-T${DEVKITPRO}/wups/share/wups.ld -C link-arg=-specs=${DEVKITPRO}/wups/share/wups.specs" }
+run_task = "wups-inner"
+
+[tasks.wups-inner]
+private = true
 env = { STRIP = "${TARGET_DIR}/${CARGO_MAKE_PROJECT_NAME}.strip.elf", ELF = "${OUT_FILE}", OUT_FILE = "${TARGET_DIR}/${CARGO_MAKE_PROJECT_NAME}.wps" }
 script = [
     "cp ${ELF} ${STRIP}",
