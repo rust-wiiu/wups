@@ -101,20 +101,24 @@ pub enum StorageError {
 impl TryFrom<i32> for StorageError {
     type Error = StorageError;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        use c_wups::WUPSStorageError::*;
+        use c_wups::WUPSStorageError as E;
         if value >= 0 {
             Ok(Self::UNKNOWN_ERROR(value))
         } else {
             match value {
-                WUPS_STORAGE_ERROR_INVALID_ARGS => Err(Self::INVALID_ARGS),
-                WUPS_STORAGE_ERROR_MALLOC_FAILED => Err(Self::MALLOC_FAILED),
-                WUPS_STORAGE_ERROR_UNEXPECTED_DATA_TYPE => Err(Self::UNEXPECTED_DATA_TYPE),
-                WUPS_STORAGE_ERROR_BUFFER_TOO_SMALL => Err(Self::BUFFER_TOO_SMALL),
-                WUPS_STORAGE_ERROR_ALREADY_EXISTS => Err(Self::ALREADY_EXISTS),
-                WUPS_STORAGE_ERROR_IO_ERROR => Err(Self::IO_ERROR),
-                WUPS_STORAGE_ERROR_NOT_FOUND => Err(Self::NOT_FOUND),
-                WUPS_STORAGE_ERROR_INTERNAL_NOT_INITIALIZED => Err(Self::INTERNAL_NOT_INITIALIZED),
-                WUPS_STORAGE_ERROR_INTERNAL_INVALID_VERSION => Err(Self::INTERNAL_INVALID_VERSION),
+                E::WUPS_STORAGE_ERROR_INVALID_ARGS => Err(Self::INVALID_ARGS),
+                E::WUPS_STORAGE_ERROR_MALLOC_FAILED => Err(Self::MALLOC_FAILED),
+                E::WUPS_STORAGE_ERROR_UNEXPECTED_DATA_TYPE => Err(Self::UNEXPECTED_DATA_TYPE),
+                E::WUPS_STORAGE_ERROR_BUFFER_TOO_SMALL => Err(Self::BUFFER_TOO_SMALL),
+                E::WUPS_STORAGE_ERROR_ALREADY_EXISTS => Err(Self::ALREADY_EXISTS),
+                E::WUPS_STORAGE_ERROR_IO_ERROR => Err(Self::IO_ERROR),
+                E::WUPS_STORAGE_ERROR_NOT_FOUND => Err(Self::NOT_FOUND),
+                E::WUPS_STORAGE_ERROR_INTERNAL_NOT_INITIALIZED => {
+                    Err(Self::INTERNAL_NOT_INITIALIZED)
+                }
+                E::WUPS_STORAGE_ERROR_INTERNAL_INVALID_VERSION => {
+                    Err(Self::INTERNAL_INVALID_VERSION)
+                }
                 v => Err(Self::UNKNOWN_ERROR(v)),
             }
         }
