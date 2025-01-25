@@ -11,8 +11,12 @@ extern crate wups_macros;
 pub use wups_macros::*;
 
 pub mod bindings;
+pub mod config;
 pub mod storage;
-pub mod ui;
+
+pub mod prelude {
+    pub use crate::config::{Attachable, ConfigMenu};
+}
 
 #[cfg(feature = "panic_handler")]
 #[panic_handler]

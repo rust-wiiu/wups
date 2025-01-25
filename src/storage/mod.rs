@@ -92,8 +92,6 @@ pub enum StorageError {
     INTERNAL_INVALID_VERSION,
     #[error("")]
     UNKNOWN_ERROR(i32),
-    #[error("An error occurred while parsing the UI tree.")]
-    MENU_UI_ERROR(#[from] crate::ui::MenuError),
     #[error("CString cannot contain internal 0-bytes.")]
     CONTAINS_NULL_BYTES(#[from] alloc::ffi::NulError),
 }
@@ -127,7 +125,7 @@ impl TryFrom<i32> for StorageError {
 
 const STORAGE_MAX_LENGTH: usize = 1024;
 
-pub trait WupsStorage {
+pub trait StorageCompatible {
     type T: Default;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type;
 
@@ -172,43 +170,43 @@ pub trait WupsStorage {
 
 // region: Impls
 
-impl WupsStorage for i32 {
+impl StorageCompatible for i32 {
     type T = i32;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S32;
 }
 
-impl WupsStorage for i64 {
+impl StorageCompatible for i64 {
     type T = i64;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S64;
 }
 
-impl WupsStorage for u32 {
+impl StorageCompatible for u32 {
     type T = u32;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U32;
 }
 
-impl WupsStorage for u64 {
+impl StorageCompatible for u64 {
     type T = u64;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U64;
 }
 
-impl WupsStorage for bool {
+impl StorageCompatible for bool {
     type T = bool;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BOOL;
 }
 
-impl WupsStorage for f32 {
+impl StorageCompatible for f32 {
     type T = f32;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_FLOAT;
 }
 
-impl WupsStorage for f64 {
+impl StorageCompatible for f64 {
     type T = f64;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_DOUBLE;
@@ -216,7 +214,7 @@ impl WupsStorage for f64 {
 
 // endregion
 
-impl WupsStorage for String {
+impl StorageCompatible for String {
     type T = String;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_STRING;
@@ -266,7 +264,7 @@ impl WupsStorage for String {
     }
 }
 
-impl WupsStorage for Vec<u8> {
+impl StorageCompatible for Vec<u8> {
     type T = Vec<u8>;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BINARY;
@@ -325,7 +323,8 @@ impl WupsStorage for Vec<u8> {
 /// assert_eq!(load::<i32>("exists"), 42);
 /// assert_eq!(load::<i32>("doesnt exist"), Err(StorageError::NOT_FOUND));
 /// ```
-pub fn load<T: WupsStorage>(name: &str) -> Result<T::T, StorageError> {
+#[inline]
+pub fn load<T: StorageCompatible>(name: &str) -> Result<T::T, StorageError> {
     T::load(name)
 }
 
@@ -340,7 +339,8 @@ pub fn load<T: WupsStorage>(name: &str) -> Result<T::T, StorageError> {
 /// assert_eq!(load::<i32>("exists"), 42);
 /// assert_eq!(load_or_default::<i32>("doesnt exist"), 0);
 /// ```
-pub fn load_or_default<T: WupsStorage>(name: &str) -> T::T {
+#[inline]
+pub fn load_or_default<T: StorageCompatible>(name: &str) -> T::T {
     match T::load(name) {
         Ok(v) => v,
         Err(_) => Default::default(),
@@ -359,11 +359,13 @@ pub fn load_or_default<T: WupsStorage>(name: &str) -> T::T {
 /// store::<f32>("float", 3.14);
 /// store::<String>("string", "Hello there!".to_string());
 /// ```
-pub fn store<T: WupsStorage>(name: &str, value: T::T) -> Result<(), StorageError> {
+#[inline]
+pub fn store<T: StorageCompatible>(name: &str, value: T::T) -> Result<(), StorageError> {
     T::store(name, value)
 }
 
 /// Deletes previously saved data from storage.
+#[inline]
 pub fn delete(name: &str) -> Result<(), StorageError> {
     let name = CString::new(name)?;
     let status = unsafe { c_wups::WUPSStorageAPI_DeleteItem(core::ptr::null_mut(), name.as_ptr()) };
@@ -372,6 +374,7 @@ pub fn delete(name: &str) -> Result<(), StorageError> {
 }
 
 /// Wipe the entire storage. **ALL DATA WILL BE LOST**.
+#[inline]
 pub fn reset() -> Result<(), StorageError> {
     let status = unsafe { c_wups::WUPSStorageAPI_WipeStorage() };
     StorageError::try_from(status)?;
@@ -379,8 +382,17 @@ pub fn reset() -> Result<(), StorageError> {
 }
 
 /// Force a reload of the storage.
+#[inline]
 pub fn reload() -> Result<(), StorageError> {
     let status = unsafe { c_wups::WUPSStorageAPI_ForceReloadStorage() };
+    StorageError::try_from(status)?;
+    Ok(())
+}
+
+/// Save the storage to disk
+#[inline]
+pub fn save(force: bool) -> Result<(), StorageError> {
+    let status = unsafe { c_wups::WUPSStorageAPI_SaveStorage(force) };
     StorageError::try_from(status)?;
     Ok(())
 }
