@@ -131,4 +131,6 @@ pub mod CafeGlyphs {
     pub const ARROW_UP_RIGHT: char = '\u{E094}';
     pub const X: char = '\u{E098}';
     pub const NFC: char = '\u{E099}';
+
+    pub const SPACE: char = '\u{3000}';
 }

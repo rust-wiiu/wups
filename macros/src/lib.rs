@@ -416,51 +416,6 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     stream
 }
 
-/*
-#[proc_macro]
-pub fn WUPS_PLUGIN_DESCRIPTION(input: TokenStream) -> TokenStream {
-    let value = parse_macro_input!(input as syn::LitStr);
-
-    TokenStream::from(quote! {
-        wups_meta!(
-            description, #value
-        );
-    })
-}
-
-#[proc_macro]
-pub fn WUPS_PLUGIN_VERSION(input: TokenStream) -> TokenStream {
-    let value = parse_macro_input!(input as syn::LitStr);
-    wups_meta(
-        quote! {
-            version, #value
-        }
-        .into(),
-    )
-}
-
-#[proc_macro]
-pub fn WUPS_PLUGIN_AUTHOR(input: TokenStream) -> TokenStream {
-    let value = parse_macro_input!(input as syn::LitStr);
-    wups_meta(
-        quote! {
-            author, #value
-        }
-        .into(),
-    )
-}
-
-#[proc_macro]
-pub fn WUPS_PLUGIN_LICENSE(input: TokenStream) -> TokenStream {
-    let value = parse_macro_input!(input as syn::LitStr);
-    wups_meta(
-        quote! {
-            license, #value
-        }
-        .into(),
-    )
-}
-*/
 fn generate_proc_macro_attribute(
     hook_type: &str,
     attr: TokenStream,
@@ -553,30 +508,30 @@ pub fn function_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
     // region: Attributes
 
     struct Attributes {
-        library: syn::Path,
+        module: syn::Path,
         function: syn::Ident,
     }
 
     impl syn::parse::Parse for Attributes {
         fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-            input.parse::<syn::Ident>()?; // Expect `library`
+            input.parse::<syn::Ident>()?; // Expect `module`
             input.parse::<syn::Token![=]>()?; // Expect `=`
-            let library: syn::Ident = input.parse()?; // Expect library name
+            let module: syn::Ident = input.parse()?; // Expect module name
 
             input.parse::<syn::Token![,]>()?; // Expect `,`
             input.parse::<syn::Ident>()?; // Expect `function`
             input.parse::<syn::Token![=]>()?; // Expect `=`
             let function: syn::Ident = input.parse()?; // Expect function name
 
-            let library = syn::Ident::new(
-                &format!("WUPS_LOADER_LIBRARY_{}", library.to_string()),
-                library.span(),
+            let module = syn::Ident::new(
+                &format!("WUPS_LOADER_LIBRARY_{}", module.to_string()),
+                module.span(),
             );
-            let library = parse_quote! {
-                ::wups::bindings::wups_loader_library_type_t::#library
+            let module = parse_quote! {
+                ::wups::bindings::wups_loader_library_type_t::#module
             };
 
-            Ok(Self { library, function })
+            Ok(Self { module, function })
         }
     }
 
@@ -625,7 +580,7 @@ pub fn function_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
         };
     }));
 
-    let library = attr.library;
+    let library = attr.module;
     let target: &syn::Ident = &item.sig.ident;
     let hooked_func_name = syn::LitByteStr::new(
         format!("{}\0", attr.function.to_string()).as_bytes(),
