@@ -2,7 +2,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned};
+use syn::{parse_macro_input, parse_quote, spanned::Spanned};
 
 // region: wups_meta
 
@@ -546,4 +546,119 @@ pub fn on_application_request_exit(attr: TokenStream, item: TokenStream) -> Toke
 #[proc_macro_attribute]
 pub fn on_application_exit(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("APPLICATION_ENDS", attr, item)
+}
+
+#[proc_macro_attribute]
+pub fn function_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // region: Attributes
+
+    struct Attributes {
+        library: syn::Path,
+        function: syn::Ident,
+    }
+
+    impl syn::parse::Parse for Attributes {
+        fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+            input.parse::<syn::Ident>()?; // Expect `library`
+            input.parse::<syn::Token![=]>()?; // Expect `=`
+            let library: syn::Ident = input.parse()?; // Expect library name
+
+            input.parse::<syn::Token![,]>()?; // Expect `,`
+            input.parse::<syn::Ident>()?; // Expect `function`
+            input.parse::<syn::Token![=]>()?; // Expect `=`
+            let function: syn::Ident = input.parse()?; // Expect function name
+
+            let library = syn::Ident::new(
+                &format!("WUPS_LOADER_LIBRARY_{}", library.to_string()),
+                library.span(),
+            );
+            let library = parse_quote! {
+                ::wups::bindings::wups_loader_library_type_t::#library
+            };
+
+            Ok(Self { library, function })
+        }
+    }
+
+    // endregion
+
+    let item = parse_macro_input!(item as syn::ItemFn);
+    let attr = parse_macro_input!(attr as Attributes);
+
+    let mut stream = TokenStream::new();
+
+    let real_func = syn::Ident::new(
+        &format!("real_{}", attr.function.to_string()),
+        attr.function.span(),
+    );
+    let signature = &item.sig.inputs;
+    let output = &item.sig.output;
+
+    stream.extend(TokenStream::from(quote! {
+        #[used]
+        #[no_mangle]
+        #[link_section = ".data"]
+        #[allow(non_upper_case_globals)]
+        static mut #real_func: Option<
+            unsafe extern "C" fn(#signature) #output
+        > = None;
+    }));
+
+    let func = &item.sig;
+    let block = &item.block;
+
+    let wrapped_func = &attr.function;
+    let wrapped_func: syn::Path = parse_quote! {
+        ::wut::bindings::#wrapped_func
+    };
+
+    stream.extend(TokenStream::from(quote! {
+        #[no_mangle]
+        extern "C" #func {
+            use #real_func as hooked;
+
+            #block
+        }
+
+        const _: () = {
+            let _ = #wrapped_func as unsafe extern "C" fn(#signature) #output;
+        };
+    }));
+
+    let library = attr.library;
+    let target: &syn::Ident = &item.sig.ident;
+    let hooked_func_name = syn::LitByteStr::new(
+        format!("{}\0", attr.function.to_string()).as_bytes(),
+        attr.function.span(),
+    );
+    let my_func_name =
+        syn::LitByteStr::new(format!("{}\0", &item.sig.ident).as_bytes(), item.span());
+    let loader_name = syn::Ident::new(
+        &format!("wups_loader_{}", target.to_string()),
+        target.span(),
+    );
+
+    stream.extend(TokenStream::from(quote! {
+        #[used]
+        #[no_mangle]
+        #[link_section = ".wups.load"]
+        #[allow(non_upper_case_globals)]
+        static #loader_name: ::wups::bindings::wups_loader_entry_t =
+            ::wups::bindings::wups_loader_entry_t {
+                type_: ::wups::bindings::wups_loader_entry_type_t::WUPS_LOADER_ENTRY_FUNCTION_MANDATORY,
+                _function: ::wups::bindings::wups_loader_entry_t__bindgen_ty_1 {
+                    physical_address: ::core::ptr::null(),
+                    virtual_address: ::core::ptr::null(),
+                    name: #hooked_func_name.as_ptr() as *const _,
+                    library: #library,
+                    my_function_name: #my_func_name.as_ptr()  as *const _,
+                    target: #target as *const ::core::ffi::c_void,
+                    call_addr: ::core::ptr::addr_of!(#real_func) as *const _ as *const ::core::ffi::c_void,
+                    targetProcess:
+                        ::wups::bindings::WUPSFPTargetProcess::WUPS_FP_TARGET_PROCESS_GAME_AND_MENU,
+                },
+            };
+    }));
+
+    stream
 }

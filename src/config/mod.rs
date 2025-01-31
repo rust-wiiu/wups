@@ -427,13 +427,13 @@ pub struct Select {
 }
 
 impl Select {
-    pub fn new(text: &str, id: &str, default: u32, options: Vec<String>) -> Self {
+    pub fn new(text: &str, id: &str, default: u32, options: Vec<impl ToString>) -> Self {
         debug_assert!(default < options.len() as u32);
         Select {
             text: text.to_string(),
             id: id.to_string(),
             default,
-            options,
+            options: options.iter().map(|s| s.to_string()).collect(),
         }
     }
 }

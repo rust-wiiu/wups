@@ -97,7 +97,7 @@ pub enum StorageError {
 }
 
 impl TryFrom<i32> for StorageError {
-    type Error = StorageError;
+    type Error = Self;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         use c_wups::WUPSStorageError as E;
         if value >= 0 {
@@ -171,43 +171,43 @@ pub trait StorageCompatible {
 // region: Impls
 
 impl StorageCompatible for i32 {
-    type T = i32;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S32;
 }
 
 impl StorageCompatible for i64 {
-    type T = i64;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S64;
 }
 
 impl StorageCompatible for u32 {
-    type T = u32;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U32;
 }
 
 impl StorageCompatible for u64 {
-    type T = u64;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U64;
 }
 
 impl StorageCompatible for bool {
-    type T = bool;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BOOL;
 }
 
 impl StorageCompatible for f32 {
-    type T = f32;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_FLOAT;
 }
 
 impl StorageCompatible for f64 {
-    type T = f64;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_DOUBLE;
 }
@@ -215,7 +215,7 @@ impl StorageCompatible for f64 {
 // endregion
 
 impl StorageCompatible for String {
-    type T = String;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_STRING;
 
@@ -265,7 +265,7 @@ impl StorageCompatible for String {
 }
 
 impl StorageCompatible for Vec<u8> {
-    type T = Vec<u8>;
+    type T = Self;
     const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
         c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BINARY;
 

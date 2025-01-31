@@ -56,6 +56,7 @@ fn main() {
         .raw_line("#![allow(non_camel_case_types)]")
         .raw_line("#![allow(non_snake_case)]")
         .raw_line("unsafe impl Sync for wups_loader_hook_t {}")
+        .raw_line("unsafe impl Sync for wups_loader_entry_t {}")
         .generate()
         .expect("Unable to generate bindings");
 

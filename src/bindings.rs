@@ -4,6 +4,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 unsafe impl Sync for wups_loader_hook_t {}
+unsafe impl Sync for wups_loader_entry_t {}
 
 #[allow(unsafe_code)]
 pub const WUPS_VERSION_STR: &::core::ffi::CStr =
