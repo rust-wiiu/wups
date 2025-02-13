@@ -1,10 +1,10 @@
-extend = [{ path = "../wut-rs/Makefile.toml" }]
+extend = [{ path = "../wut/Makefile.toml" }]
 
 [env]
-LINKER_ARGS = { value = "-C link-arg=-T${DEVKITPRO}/wups/share/wups.ld -C link-arg=-specs=${DEVKITPRO}/wups/share/wups.specs", condition.env = { "CARGO_MAKE_TASK" = "wups" } }
+RUSTFLAGS = { value = "", condition.env_not_set = ["RUSTFLAGS"] }
 
 [tasks.wups]
-env = { LINKER_ARGS = "-C link-arg=-T${DEVKITPRO}/wups/share/wups.ld -C link-arg=-specs=${DEVKITPRO}/wups/share/wups.specs" }
+env = { RUSTFLAGS = "-Clink-arg=-T${DEVKITPRO}/wups/share/wups.ld -Clink-arg=-specs=${DEVKITPRO}/wups/share/wups.specs ${RUSTFLAGS}" }
 run_task = "wups-inner"
 
 [tasks.wups-inner]

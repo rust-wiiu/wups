@@ -3,6 +3,7 @@ name = "wups"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+links = "wups"
 
 [features]
 default = []
@@ -21,7 +22,7 @@ dev.panic = "abort"
 release.panic = "abort"
 
 [dependencies]
-wut = { path = "../wut-rs" }
+wut = { path = "../wut" }
 wups-macros = { path = "./macros" }
 flagset = { version = "0.4.6", default-features = false }
 thiserror = { version = "2.0.3", default-features = false }
