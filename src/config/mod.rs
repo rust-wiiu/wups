@@ -1,8 +1,6 @@
-// ui
+//! Config Menu in the Aroma Plugin Menu
 
 // this is quite cool but overkill for now: https://github.com/dkosmari/libwupsxx
-
-pub mod glyphs;
 
 use core::ffi::CStr;
 
@@ -85,9 +83,19 @@ impl TryFrom<c_wups::WUPSConfigAPICallbackStatus::Type> for MenuError {
 
 // endregion
 
-/// Used for creating **stateless** config menu
+/// Used for creating **stateless** config menu. Information is stored via [storage][crate::storage].
 ///
-/// Open the menu by pressing "↓ + L + Minus" on the gamepad
+/// Open the menu by pressing "↓ + L + Minus" on the gamepad.
+///
+/// # Example
+/// ```
+/// struct MyMenu;
+/// impl ConfigMenu for MyMenu {
+///     fn open(root: config::MenuRoot) -> Result<(), config::MenuError> {
+///         root.add(config::Label::new("Label"))?;
+///     }
+/// }
+/// ```
 pub trait ConfigMenu {
     /// Initialize the config menu
     ///
@@ -126,8 +134,16 @@ pub trait ConfigMenu {
     /// **Should not be overwritten unless special control is required.**
     extern "C" fn _close_callback() {}
 
+    /// Open callback.
+    ///
+    /// Called when the plugin menu is opened.
+    ///
+    /// All items must be rooted in the `root` node to be added to the UI.
     fn open(root: MenuRoot) -> Result<(), MenuError>;
 
+    /// Close callback.
+    ///
+    /// Called when the plugin menu is closed.
     fn close() -> Result<(), MenuError> {
         Ok(())
     }
@@ -161,6 +177,16 @@ impl Attachable for MenuRoot {
 
 // region: Menu
 
+/// Sub menu containing items.
+///
+/// # Example
+///
+/// ```
+/// let sub = config::Menu::new("Menu 1")?;
+/// sub.add(config::Label::new("Label 1"))?;
+/// sub.add(config::Label::new("Label 2"))?;
+/// root.add(sub)?;
+/// ```
 pub struct Menu {
     text: String,
     handle: c_wups::WUPSConfigCategoryHandle,
@@ -212,6 +238,13 @@ impl MenuItem for Menu {
 
 // region: Label
 
+/// Text display
+///
+/// # Example
+///
+/// ```
+/// root.add(config::Label::new("Label"))?;
+/// ```
 pub struct Label {
     text: String,
 }
@@ -238,6 +271,23 @@ impl MenuItem for Label {
 
 // region: Toggle
 
+/// Binary toggle
+///
+/// # Example
+///
+/// ```
+/// root.add(config::Toggle::new(
+///     "Toggle",
+///     "my_toggle_id",
+///     true,
+///     "On",
+///     "Off",
+/// ))?;
+///
+/// assert_eq!(storage::load::<bool>("my_toggle_id").unwrap(), true);
+/// // toggle is changed...
+/// assert_eq!(storage::load::<bool>("my_toggle_id").unwrap(), false);
+/// ```
 pub struct Toggle {
     text: String,
     id: String,
@@ -247,6 +297,13 @@ pub struct Toggle {
 }
 
 impl Toggle {
+    /// # Arguments
+    ///
+    /// - `text`: Text to display on the toggle.
+    /// - `id`: [storage][crate::storage] id to access value.
+    /// - `default`: Default value if id doesn't exist in storage.
+    /// - `trueValue`: Text to display when value is `true`.
+    /// - `falseValue`: Text to display when value is `false`.
     pub fn new(text: &str, id: &str, default: bool, trueValue: &str, falseValue: &str) -> Self {
         Self {
             text: text.to_string(),
@@ -303,6 +360,17 @@ extern "C" fn _callback_toggle_changed(item: *mut c_wups::ConfigItemBoolean, val
 
 // region: Range
 
+/// Select a number from a range.
+///
+/// # Example
+///
+/// ```
+/// root.add(config::Range::new("Range", "my_range_id", 0, -5, 5))?;
+///
+/// assert_eq!(storage::load::<i32>("my_range_id").unwrap(), 0);
+/// // range is increased...
+/// assert_eq!(storage::load::<i32>("my_range_id").unwrap(), 1);
+/// ```
 pub struct Range {
     text: String,
     id: String,
@@ -419,6 +487,22 @@ impl<T: RangeCompatible> MenuItem for Range<T> {
 
 // region: Select
 
+/// Select a value from a predefined list.
+///
+/// # Example
+///
+/// ```
+/// root.add(config::Select::new(
+///     "Select",
+///     "my_select_id",
+///     0,
+///     vec!["A", "B", "C"],
+/// ))?;
+///
+/// assert_eq!(storage::load::<u32>("my_select_id").unwrap(), 0);
+/// // select is switched to "C"...
+/// assert_eq!(storage::load::<u32>("my_select_id").unwrap(), 2);
+/// ```
 pub struct Select {
     text: String,
     id: String,
@@ -497,197 +581,3 @@ extern "C" fn _callback_select_changed(item: *mut c_wups::ConfigItemMultipleValu
 }
 
 // endregion
-
-/*
-use crate::{bindings as c_wups, storage::StorageError};
-use alloc::{ffi::CString, string::String, vec::Vec};
-use core::ffi::CStr;
-
-use wut::sync::OnceLock;
-
-static MENU_UI: OnceLock<MenuItem> = OnceLock::new();
-
-#[derive(Debug, Clone)]
-pub enum MenuItem {
-    Root {
-        name: String,
-        items: Vec<MenuItem>,
-    },
-    Label {
-        text: String,
-    },
-    Toggle {
-        text: String,
-        value: bool,
-        trueValue: String,
-        falseValue: String,
-        changed: (),
-    },
-    Range {
-        text: String,
-        value: i32,
-        min: i32,
-        max: i32,
-        changed: (),
-    },
-    Select {
-        text: String,
-        index: i32,
-        options: Vec<&'static CStr>,
-        changed: (),
-    },
-    // Category,
-}
-
-*/
-
-/*
-
-pub struct MenuUI;
-
-impl MenuUI {
-    pub fn new(ui: MenuItem) -> Result<(), StorageError> {
-        if MENU_UI.get().is_some() {
-            return Err(StorageError::MENU_UI_ERROR(MenuError::ALREADY_INITIALIZED));
-        }
-
-        if let MenuItem::Root { ref name, .. } = ui {
-            let name = CString::new(name.clone()).unwrap();
-            let opt = c_wups::WUPSConfigAPIOptionsV1 {
-                name: name.as_ptr(),
-            };
-            let status =
-                unsafe { c_wups::WUPSConfigAPI_Init(opt, Some(menu_open), Some(menu_close)) };
-            MenuError::try_from(status)?;
-
-            let _ = MENU_UI.set(ui);
-            Ok(())
-        } else {
-            Err(StorageError::MENU_UI_ERROR(MenuError::MUST_CONTAIN_ROOT))
-        }
-    }
-}
-
-unsafe extern "C" fn menu_open(
-    root: c_wups::WUPSConfigCategoryHandle,
-) -> c_wups::WUPSConfigAPICallbackStatus::Type {
-    use c_wups::WUPSConfigAPICallbackStatus::{
-        WUPSCONFIG_API_CALLBACK_RESULT_ERROR as ERROR,
-        WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS as SUCCESS,
-    };
-    use c_wups::WUPSConfigAPIStatus as Status;
-
-    wut::bindings::WHBLogUdpInit();
-
-    let ui = if let Some(ui) = MENU_UI.get() {
-        ui
-    } else {
-        return SUCCESS;
-    };
-
-    let mut status = Status::Type::default();
-    if let MenuItem::Root { items, .. } = ui {
-        for item in items {
-            match item {
-                MenuItem::Label { text } => {
-                    let text = CString::new(text.as_str()).unwrap();
-
-                    status = c_wups::WUPSConfigItemStub_AddToCategory(root, text.as_ptr());
-                }
-                MenuItem::Toggle {
-                    text,
-                    value,
-                    trueValue,
-                    falseValue,
-                    changed,
-                } => {
-                    let text = CString::new(text.as_str()).unwrap();
-                    let trueValue = CString::new(trueValue.as_str()).unwrap();
-                    let falseValue = CString::new(falseValue.as_str()).unwrap();
-
-                    status = c_wups::WUPSConfigItemBoolean_AddToCategoryEx(
-                        root,
-                        c"toggle".as_ptr(),
-                        text.as_ptr(),
-                        Default::default(),
-                        *value,
-                        Some(callback_boolean),
-                        trueValue.as_ptr(),
-                        falseValue.as_ptr(),
-                    );
-                }
-                MenuItem::Range {
-                    text,
-                    value,
-                    min,
-                    max,
-                    changed,
-                } => {
-                    let text = CString::new(text.as_str()).unwrap();
-
-                    status = c_wups::WUPSConfigItemIntegerRange_AddToCategory(
-                        root,
-                        c"range".as_ptr(),
-                        text.as_ptr(),
-                        Default::default(),
-                        *value,
-                        *min,
-                        *max,
-                        None,
-                    );
-                }
-                MenuItem::Select {
-                    text,
-                    index,
-                    options,
-                    changed,
-                } => {
-                    let text = CString::new(text.as_str()).unwrap();
-                    let mut values = options
-                        .iter()
-                        .enumerate()
-                        .map(|(i, s)| c_wups::ConfigItemMultipleValuesPair {
-                            value: i as u32,
-                            valueName: s.as_ptr(),
-                        })
-                        .collect::<Vec<_>>();
-
-                    status = c_wups::WUPSConfigItemMultipleValues_AddToCategory(
-                        root,
-                        c"select".as_ptr(),
-                        text.as_ptr(),
-                        Default::default(),
-                        *index,
-                        values.as_mut_ptr(),
-                        values.len() as i32,
-                        None,
-                    );
-                }
-                MenuItem::Root { .. } => return ERROR,
-                _ => return ERROR,
-            }
-
-            if status != Status::WUPSCONFIG_API_RESULT_SUCCESS {
-                break;
-            }
-        }
-
-        wut::
-        bindings::WHBLogUdpDeinit();
-
-        SUCCESS
-    } else {
-        ERROR
-    }
-}
-
-unsafe extern "C" fn menu_close() {}
-
-unsafe extern "C" fn callback_boolean(config_item: *mut c_wups::ConfigItemBoolean, value: bool) {
-    wut::bindings::WHBLogUdpInit();
-
-    wut::println!("{:?}, {:?}", *config_item, value);
-
-    wut::bindings::WHBLogUdpDeinit();
-}
-*/

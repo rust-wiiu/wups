@@ -12,23 +12,9 @@ fn main() {
     let dkp = env::var("DEVKITPRO").expect("Please provided DEVKITPRO via env variables");
     let ppc = env::var("DEVKITPPC").expect("Please provided DEVKITPPC via env variables");
 
-    println!("{link_search_path}={ppc}/powerpc-eabi/lib",);
-    println!("{link_search_path}={ppc}/lib/gcc/powerpc-eabi/13.1.0");
     println!("{link_search_path}={dkp}/wups/lib/");
-    println!("{link_search_path}={dkp}/wut/lib/");
-
     println!("{link_lib}=wups");
-    println!("{link_lib}=wut");
-    println!("{link_lib}=m");
-    println!("{link_lib}=c");
-    println!("{link_lib}=g");
-    println!("{link_lib}=gcc");
-    println!("{link_lib}=sysbase");
 
-    /*
-     * These bindings will create many errors since the target cpu is a 32bit system and the host (the compilation PC) is likely a 64bit system.
-     * There are alignment and size checks which will fail, because pointers have different sizes.
-     */
     let bindings = bindgen::Builder::default()
         .use_core()
         .header("src/wrapper.h")
@@ -43,8 +29,6 @@ fn main() {
         .clang_args(vec![
             "--target=powerpc-none-eabi",
             &format!("--sysroot={ppc}/powerpc-eabi"),
-            // "-xc++",
-            // "-std=c++20",
             "-m32",
             "-mfloat-abi=hard",
             &format!("-I{dkp}/wups/include"),

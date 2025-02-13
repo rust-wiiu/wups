@@ -112,6 +112,24 @@ pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
 
 // endregion
 
+/// Setup important WUPS meta information.
+///
+/// **This is required to be called in all plugin!**
+///
+/// This bundles the following macros from the C API.
+/// - `WUPS_PLUGIN_NAME`
+/// - `WUPS_PLUGIN_DESCRIPTION` (from Cargo.toml)
+/// - `WUPS_PLUGIN_VERSION` (from Cargo.toml)
+/// - `WUPS_PLUGIN_AUTHOR` (from Cargo.toml)
+/// - `WUPS_PLUGIN_LICENSE` (from Cargo.toml)
+///
+/// These information will be displayed in the [ConfigMenu][wups::config::ConfigMenu].
+///
+/// # Example
+///
+/// ```
+/// WUPS_PLUGIN_NAME!("Rust Plugin");
+/// ```
 #[proc_macro]
 pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     let mut stream = TokenStream::new();
@@ -468,41 +486,76 @@ fn generate_proc_macro_attribute(
     })
 }
 
+/// Called when plugin is loaded.
 #[proc_macro_attribute]
 pub fn on_initialize(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("INIT_PLUGIN", attr, item)
 }
 
+/// Called when plugin is unloaded.
 #[proc_macro_attribute]
 pub fn on_deinitialize(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("DEINIT_PLUGIN", attr, item)
 }
 
+/// Called when an (foreground?) application is opened.
 #[proc_macro_attribute]
 pub fn on_application_start(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("APPLICATION_STARTS", attr, item)
 }
 
+/// Called when the foreground application releases the foreground.
 #[proc_macro_attribute]
 pub fn on_release_foreground(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("RELEASE_FOREGROUND", attr, item)
 }
 
+/// Called when a new application acquired the foreground.
 #[proc_macro_attribute]
 pub fn on_acquired_foreground(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("ACQUIRED_FOREGROUND", attr, item)
 }
 
+/// Called when foreground application is about to close.
 #[proc_macro_attribute]
 pub fn on_application_request_exit(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("APPLICATION_REQUESTS_EXIT", attr, item)
 }
 
+/// Called when foreground application was closed.
 #[proc_macro_attribute]
 pub fn on_application_exit(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_proc_macro_attribute("APPLICATION_ENDS", attr, item)
 }
 
+/// A macro to hook a WUT function.
+///
+/// Provides lightweight access to WUT functions which would degrade performance when called from within a plugin. Additionally allows to completely overwrite function behavior.
+///
+/// The function arguments must match the hooked function's. The hooked "original" function is accessible inside the body via the `hooked` variable.
+///
+/// This bundles the `DECL_FUNCTION` and `WUPS_MUST_REPLACE` macros from the C API.
+///
+/// # Attributes
+///
+/// - `module`: One of `wups::bindings::wups_loader_library_type_t`.
+/// - `function`: A function from the respective `module` which should be hooked.
+///
+/// # Example
+///
+/// ```
+/// #[function_hook(module = VPAD, function = VPADRead)]
+/// fn my_VPADRead(
+///     chan: wut::bindings::VPADChan::Type,
+///     buffers: *mut wut::bindings::VPADStatus,
+///     count: u32,
+///     error: *mut wut::bindings::VPADReadError::Type,
+/// ) -> i32 {
+///     let status = unsafe { hooked(chan, buffers, count, error) };
+///     // any custom code
+///     status
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn function_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
     // region: Attributes
@@ -567,10 +620,12 @@ pub fn function_hook(attr: TokenStream, item: TokenStream) -> TokenStream {
         ::wut::bindings::#wrapped_func
     };
 
+    let wrapped_func_name = syn::LitStr::new(&attr.function.to_string(), attr.function.span());
+
     stream.extend(TokenStream::from(quote! {
         #[no_mangle]
         extern "C" #func {
-            use #real_func as hooked;
+            let hooked = unsafe { #real_func.expect(&format!("The function \"{}\" was not properly hooked.", #wrapped_func_name)) };
 
             #block
         }
