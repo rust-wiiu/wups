@@ -145,6 +145,7 @@ pub trait ConfigMenu {
     ///
     /// Called when the plugin menu is closed.
     fn close() -> Result<(), MenuError> {
+        storage::save(false)?;
         Ok(())
     }
 }
