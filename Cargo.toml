@@ -1,28 +1,30 @@
 [package]
 name = "wups"
+description = "Wii U Plugin System for Rust"
+license-file = "LICENSE"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/rust-wiiu/wups"
+publish = false
 build = "build.rs"
 links = "wups"
 
 [features]
 default = []
-panic_handler = []
-macros = []
 
 [lib]
 name = "wups"
 crate-type = ["lib"]
 
 [build-dependencies]
-bindgen = "0.70.1"
+bindgen = "0.71.1"
 
 [profile]
 dev.panic = "abort"
 release.panic = "abort"
 
 [dependencies]
-wut = { path = "../wut" }
-wups-macros = { path = "./macros" }
+wut = { path = "../wut", version = "0.2.0" }
+wups-macros = { path = "./macros", version = "0.1.0" }
 flagset = { version = "0.4.6", default-features = false }
 thiserror = { version = "2.0.3", default-features = false }
