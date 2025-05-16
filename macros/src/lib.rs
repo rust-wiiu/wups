@@ -67,8 +67,8 @@ pub fn wups_meta(input: TokenStream) -> TokenStream {
 // region: wups_hook_ex
 
 struct Hook {
-    hook_type: syn::Ident,
-    hook_target: syn::Ident,
+    hook_type: syn::LitStr,
+    hook_target: syn::Path,
 }
 
 impl syn::parse::Parse for Hook {
@@ -91,19 +91,26 @@ pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
     } = parse_macro_input!(input as Hook);
 
     let hook_type: syn::ExprPath = syn::parse_str(&format!(
-        "wups::bindings::wups_loader_hook_type_t::WUPS_LOADER_HOOK_{}",
-        hook_type.to_string()
+        "::wups::bindings::wups_loader_hook_type_t::WUPS_LOADER_HOOK_{}",
+        hook_type.value()
     ))
     .unwrap();
 
-    let name = syn::Ident::new(&format!("wups_hooks_{}", hook_target), hook_target.span());
+    // let name = syn::Ident::new(&format!("wups_hooks_{}", hook_target), hook_target.span());
+
+    let segments: Vec<String> = hook_target.segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect();
+
+    let name = syn::Ident::new(&format!("wups_hooks_{}", segments.join("__")), hook_target.span());
 
     TokenStream::from(quote! {
         #[used]
         #[no_mangle]
         #[link_section = ".wups.hooks"]
         #[allow(non_upper_case_globals)]
-        static #name: wups::bindings::wups_loader_hook_t = wups::bindings::wups_loader_hook_t {
+        static #name: ::wups::bindings::wups_loader_hook_t = ::wups::bindings::wups_loader_hook_t {
             type_: #hook_type,
             target: #hook_target as *const ::core::ffi::c_void
         };
@@ -193,8 +200,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_malloc();
         }
 
-        wups_hook_ex!(INIT_WUT_MALLOC, on_init_wut_malloc);
-        wups_hook_ex!(FINI_WUT_MALLOC, on_fini_wut_malloc);
+        wups_hook_ex!("INIT_WUT_MALLOC", on_init_wut_malloc);
+        wups_hook_ex!("FINI_WUT_MALLOC", on_fini_wut_malloc);
     }));
 
     // endregion
@@ -221,8 +228,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             }
         }
 
-        wups_hook_ex!(INIT_WUT_SOCKETS, on_init_wut_sockets);
-        wups_hook_ex!(FINI_WUT_SOCKETS, on_fini_wut_sockets);
+        wups_hook_ex!("INIT_WUT_SOCKETS", on_init_wut_sockets);
+        wups_hook_ex!("FINI_WUT_SOCKETS", on_fini_wut_sockets);
     }));
 
     // endregion
@@ -243,8 +250,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_newlib();
         }
 
-        wups_hook_ex!(INIT_WUT_NEWLIB, on_init_wut_newlib);
-        wups_hook_ex!(FINI_WUT_NEWLIB, on_fini_wut_newlib);
+        wups_hook_ex!("INIT_WUT_NEWLIB", on_init_wut_newlib);
+        wups_hook_ex!("FINI_WUT_NEWLIB", on_fini_wut_newlib);
     }));
 
     // endregion
@@ -265,8 +272,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_stdcpp();
         }
 
-        wups_hook_ex!(INIT_WUT_STDCPP, on_init_wut_stdcpp);
-        wups_hook_ex!(FINI_WUT_STDCPP, on_fini_wut_stdcpp);
+        wups_hook_ex!("INIT_WUT_STDCPP", on_init_wut_stdcpp);
+        wups_hook_ex!("FINI_WUT_STDCPP", on_fini_wut_stdcpp);
     }));
     // endregion
 
@@ -286,8 +293,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_stdcpp();
         }
 
-        wups_hook_ex!(INIT_WUT_DEVOPTAB, on_init_wut_devoptab);
-        wups_hook_ex!(FINI_WUT_DEVOPTAB, on_fini_wut_devoptab);
+        wups_hook_ex!("INIT_WUT_DEVOPTAB", on_init_wut_devoptab);
+        wups_hook_ex!("FINI_WUT_DEVOPTAB", on_fini_wut_devoptab);
     }));
 
     // endregion
@@ -314,14 +321,14 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
 
     stream.extend(wups_hook_ex(
         quote! {
-            INIT_WRAPPER, __init_wrapper
+            "INIT_WRAPPER", __init_wrapper
         }
         .into(),
     ));
 
     stream.extend(wups_hook_ex(
         quote! {
-            FINI_WRAPPER, __fini_wrapper
+            "FINI_WRAPPER", __fini_wrapper
         }
         .into(),
     ));
@@ -342,7 +349,7 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             WUPSConfigAPI_InitLibrary_Internal(args);
         }
 
-        wups_hook_ex!(INIT_CONFIG, wups_init_config_functions);
+        wups_hook_ex!("INIT_CONFIG", wups_init_config_functions);
 
     }));
 
@@ -365,7 +372,7 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             }
         }
 
-        wups_hook_ex!(INIT_STORAGE, init_storage);
+        wups_hook_ex!("INIT_STORAGE", init_storage);
 
     }));
 
@@ -472,7 +479,7 @@ fn generate_proc_macro_attribute(
         quote! {}
     };
 
-    let hook_type = syn::Ident::new(hook_type, hook_type.span());
+    let hook_type = syn::LitStr::new(hook_type, hook_type.span());
 
     TokenStream::from(quote! {
         #[no_mangle]
@@ -482,7 +489,7 @@ fn generate_proc_macro_attribute(
             #logger_deinit
         }
 
-        wups_hook_ex!(#hook_type, #func);
+        ::wups::wups_hook_ex!(#hook_type, #func);
     })
 }
 
