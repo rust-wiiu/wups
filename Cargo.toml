@@ -24,7 +24,7 @@ dev.panic = "abort"
 release.panic = "abort"
 
 [dependencies]
-wut = { git = "https://github.com/rust-wiiu/wut", branch = "main" }
+wut = { git = "https://github.com/rust-wiiu/wut", tag = "v0.3.0" }
 wups-macros = { path = "./macros", version = "0.1.0" }
 flagset = { version = "0.4.6", default-features = false }
 thiserror = { version = "2.0.3", default-features = false }
