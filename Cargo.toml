@@ -2,7 +2,7 @@
 name = "wups"
 description = "Wii U Plugin System for Rust"
 license-file = "LICENSE"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 repository = "https://github.com/rust-wiiu/wups"
 publish = false
