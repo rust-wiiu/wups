@@ -204,8 +204,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_malloc();
         }
 
-        wups_hook_ex!("INIT_WUT_MALLOC", on_init_wut_malloc);
-        wups_hook_ex!("FINI_WUT_MALLOC", on_fini_wut_malloc);
+        ::wups::wups_hook_ex!("INIT_WUT_MALLOC", on_init_wut_malloc);
+        ::wups::wups_hook_ex!("FINI_WUT_MALLOC", on_fini_wut_malloc);
     }));
 
     // endregion
@@ -232,8 +232,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             }
         }
 
-        wups_hook_ex!("INIT_WUT_SOCKETS", on_init_wut_sockets);
-        wups_hook_ex!("FINI_WUT_SOCKETS", on_fini_wut_sockets);
+        ::wups::wups_hook_ex!("INIT_WUT_SOCKETS", on_init_wut_sockets);
+        ::wups::wups_hook_ex!("FINI_WUT_SOCKETS", on_fini_wut_sockets);
     }));
 
     // endregion
@@ -254,8 +254,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_newlib();
         }
 
-        wups_hook_ex!("INIT_WUT_NEWLIB", on_init_wut_newlib);
-        wups_hook_ex!("FINI_WUT_NEWLIB", on_fini_wut_newlib);
+        ::wups::wups_hook_ex!("INIT_WUT_NEWLIB", on_init_wut_newlib);
+        ::wups::wups_hook_ex!("FINI_WUT_NEWLIB", on_fini_wut_newlib);
     }));
 
     // endregion
@@ -276,8 +276,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_stdcpp();
         }
 
-        wups_hook_ex!("INIT_WUT_STDCPP", on_init_wut_stdcpp);
-        wups_hook_ex!("FINI_WUT_STDCPP", on_fini_wut_stdcpp);
+        ::wups::wups_hook_ex!("INIT_WUT_STDCPP", on_init_wut_stdcpp);
+        ::wups::wups_hook_ex!("FINI_WUT_STDCPP", on_fini_wut_stdcpp);
     }));
     // endregion
 
@@ -297,8 +297,8 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             __fini_wut_stdcpp();
         }
 
-        wups_hook_ex!("INIT_WUT_DEVOPTAB", on_init_wut_devoptab);
-        wups_hook_ex!("FINI_WUT_DEVOPTAB", on_fini_wut_devoptab);
+        ::wups::wups_hook_ex!("INIT_WUT_DEVOPTAB", on_init_wut_devoptab);
+        ::wups::wups_hook_ex!("FINI_WUT_DEVOPTAB", on_fini_wut_devoptab);
     }));
 
     // endregion
@@ -353,7 +353,7 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             WUPSConfigAPI_InitLibrary_Internal(args);
         }
 
-        wups_hook_ex!("INIT_CONFIG", wups_init_config_functions);
+        ::wups::wups_hook_ex!("INIT_CONFIG", wups_init_config_functions);
 
     }));
 
@@ -376,7 +376,7 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
             }
         }
 
-        wups_hook_ex!("INIT_STORAGE", init_storage);
+        ::wups::wups_hook_ex!("INIT_STORAGE", init_storage);
 
     }));
 
