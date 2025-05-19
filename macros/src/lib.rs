@@ -98,12 +98,16 @@ pub fn wups_hook_ex(input: TokenStream) -> TokenStream {
 
     // let name = syn::Ident::new(&format!("wups_hooks_{}", hook_target), hook_target.span());
 
-    let segments: Vec<String> = hook_target.segments
+    let segments: Vec<String> = hook_target
+        .segments
         .iter()
         .map(|segment| segment.ident.to_string())
         .collect();
 
-    let name = syn::Ident::new(&format!("wups_hooks_{}", segments.join("__")), hook_target.span());
+    let name = syn::Ident::new(
+        &format!("wups_hooks_{}", segments.join("__")),
+        hook_target.span(),
+    );
 
     TokenStream::from(quote! {
         #[used]
@@ -147,12 +151,12 @@ pub fn WUPS_PLUGIN_NAME(input: TokenStream) -> TokenStream {
     let buildtimestamp = chrono::Utc::now().format("%b %d %Y %H:%M:%S").to_string(); // format as: "Feb 12 1996 23:59:01"
 
     stream.extend(TokenStream::from(quote! {
-        wups_meta!(name, #name);
-        wups_meta!(description, env!("CARGO_PKG_DESCRIPTION"));
-        wups_meta!(version, env!("CARGO_PKG_VERSION"));
-        wups_meta!(author, env!("CARGO_PKG_AUTHORS"));
-        wups_meta!(license, env!("CARGO_PKG_LICENSE"));
-        wups_meta!(buildtimestamp, #buildtimestamp);
+        ::wups::wups_meta!(name, #name);
+        ::wups::wups_meta!(description, env!("CARGO_PKG_DESCRIPTION"));
+        ::wups::wups_meta!(version, env!("CARGO_PKG_VERSION"));
+        ::wups::wups_meta!(author, env!("CARGO_PKG_AUTHORS"));
+        ::wups::wups_meta!(license, env!("CARGO_PKG_LICENSE"));
+        ::wups::wups_meta!(buildtimestamp, #buildtimestamp);
     }));
 
     // endregion
