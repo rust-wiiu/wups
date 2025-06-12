@@ -62,62 +62,58 @@
 
 use core::ffi;
 
-use crate::bindings as c_wups;
 use alloc::{
     ffi::CString,
     string::{String, ToString},
     vec::Vec,
 };
 use thiserror::Error;
+use wups_sys as sys;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
     #[error("")]
-    INVALID_ARGS,
+    InvalidArgs,
     #[error("")]
-    MALLOC_FAILED,
+    MallocFailed,
     #[error("")]
-    UNEXPECTED_DATA_TYPE,
+    UnexpectedDataType,
     #[error("")]
-    BUFFER_TOO_SMALL,
+    BufferTooSmall,
     #[error("")]
-    ALREADY_EXISTS,
+    AlreadyExists,
     #[error("")]
-    IO_ERROR,
+    IoError,
     #[error("")]
-    NOT_FOUND,
+    NotFound,
     #[error("")]
-    INTERNAL_NOT_INITIALIZED,
+    InternalNotInitialized,
     #[error("")]
-    INTERNAL_INVALID_VERSION,
+    InternalInvalidVersion,
     #[error("")]
-    UNKNOWN_ERROR(i32),
+    UnknownError(i32),
     #[error("CString cannot contain internal 0-bytes.")]
-    CONTAINS_NULL_BYTES(#[from] alloc::ffi::NulError),
+    ContainsNullBytes(#[from] alloc::ffi::NulError),
 }
 
 impl TryFrom<i32> for StorageError {
     type Error = Self;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        use c_wups::WUPSStorageError as E;
+        use sys::WUPSStorageError as E;
         if value >= 0 {
-            Ok(Self::UNKNOWN_ERROR(value))
+            Ok(Self::UnknownError(value))
         } else {
             match value {
-                E::WUPS_STORAGE_ERROR_INVALID_ARGS => Err(Self::INVALID_ARGS),
-                E::WUPS_STORAGE_ERROR_MALLOC_FAILED => Err(Self::MALLOC_FAILED),
-                E::WUPS_STORAGE_ERROR_UNEXPECTED_DATA_TYPE => Err(Self::UNEXPECTED_DATA_TYPE),
-                E::WUPS_STORAGE_ERROR_BUFFER_TOO_SMALL => Err(Self::BUFFER_TOO_SMALL),
-                E::WUPS_STORAGE_ERROR_ALREADY_EXISTS => Err(Self::ALREADY_EXISTS),
-                E::WUPS_STORAGE_ERROR_IO_ERROR => Err(Self::IO_ERROR),
-                E::WUPS_STORAGE_ERROR_NOT_FOUND => Err(Self::NOT_FOUND),
-                E::WUPS_STORAGE_ERROR_INTERNAL_NOT_INITIALIZED => {
-                    Err(Self::INTERNAL_NOT_INITIALIZED)
-                }
-                E::WUPS_STORAGE_ERROR_INTERNAL_INVALID_VERSION => {
-                    Err(Self::INTERNAL_INVALID_VERSION)
-                }
-                v => Err(Self::UNKNOWN_ERROR(v)),
+                E::WUPS_STORAGE_ERROR_INVALID_ARGS => Err(Self::InvalidArgs),
+                E::WUPS_STORAGE_ERROR_MALLOC_FAILED => Err(Self::MallocFailed),
+                E::WUPS_STORAGE_ERROR_UNEXPECTED_DATA_TYPE => Err(Self::UnexpectedDataType),
+                E::WUPS_STORAGE_ERROR_BUFFER_TOO_SMALL => Err(Self::BufferTooSmall),
+                E::WUPS_STORAGE_ERROR_ALREADY_EXISTS => Err(Self::AlreadyExists),
+                E::WUPS_STORAGE_ERROR_IO_ERROR => Err(Self::IoError),
+                E::WUPS_STORAGE_ERROR_NOT_FOUND => Err(Self::NotFound),
+                E::WUPS_STORAGE_ERROR_INTERNAL_NOT_INITIALIZED => Err(Self::InternalNotInitialized),
+                E::WUPS_STORAGE_ERROR_INTERNAL_INVALID_VERSION => Err(Self::InternalInvalidVersion),
+                v => Err(Self::UnknownError(v)),
             }
         }
     }
@@ -127,7 +123,7 @@ const STORAGE_MAX_LENGTH: usize = 1024;
 
 pub trait StorageCompatible {
     type T: Default;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type;
 
     fn load(name: &str) -> Result<Self::T, StorageError> {
         let name = CString::new(name)?;
@@ -135,7 +131,7 @@ pub trait StorageCompatible {
         let mut out = 0;
 
         let status = unsafe {
-            c_wups::WUPSStorageAPI_GetItem(
+            sys::WUPSStorageAPI_GetItem(
                 core::ptr::null_mut(),
                 name.as_ptr(),
                 Self::ITEM_TYPE,
@@ -154,7 +150,7 @@ pub trait StorageCompatible {
         let name = CString::new(name)?;
         let mut value = value;
         let status = unsafe {
-            c_wups::WUPSStorageAPI_StoreItem(
+            sys::WUPSStorageAPI_StoreItem(
                 core::ptr::null_mut(),
                 name.as_ptr() as *const _,
                 Self::ITEM_TYPE,
@@ -172,52 +168,52 @@ pub trait StorageCompatible {
 
 impl StorageCompatible for i32 {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S32;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S32;
 }
 
 impl StorageCompatible for i64 {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S64;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_S64;
 }
 
 impl StorageCompatible for u32 {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U32;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U32;
 }
 
 impl StorageCompatible for u64 {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U64;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_U64;
 }
 
 impl StorageCompatible for bool {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BOOL;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BOOL;
 }
 
 impl StorageCompatible for f32 {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_FLOAT;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_FLOAT;
 }
 
 impl StorageCompatible for f64 {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_DOUBLE;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_DOUBLE;
 }
 
 // endregion
 
 impl StorageCompatible for String {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_STRING;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_STRING;
 
     fn load(name: &str) -> Result<Self::T, StorageError> {
         let name = CString::new(name)?;
@@ -225,7 +221,7 @@ impl StorageCompatible for String {
         let mut out = 0;
 
         let status = unsafe {
-            c_wups::WUPSStorageAPI_GetItem(
+            sys::WUPSStorageAPI_GetItem(
                 core::ptr::null_mut(),
                 name.as_ptr(),
                 Self::ITEM_TYPE,
@@ -245,12 +241,12 @@ impl StorageCompatible for String {
     fn store(name: &str, value: Self::T) -> Result<(), StorageError> {
         let name = CString::new(name)?;
         if value.len() >= STORAGE_MAX_LENGTH {
-            return Err(StorageError::BUFFER_TOO_SMALL);
+            return Err(StorageError::BufferTooSmall);
         }
         let mut value = value;
 
         let status = unsafe {
-            c_wups::WUPSStorageAPI_StoreItem(
+            sys::WUPSStorageAPI_StoreItem(
                 core::ptr::null_mut(),
                 name.as_ptr() as *const _,
                 Self::ITEM_TYPE,
@@ -266,8 +262,8 @@ impl StorageCompatible for String {
 
 impl StorageCompatible for Vec<u8> {
     type T = Self;
-    const ITEM_TYPE: c_wups::WUPSStorageItemTypes::Type =
-        c_wups::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BINARY;
+    const ITEM_TYPE: sys::WUPSStorageItemTypes::Type =
+        sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BINARY;
 
     fn load(name: &str) -> Result<Self::T, StorageError> {
         let name = CString::new(name)?;
@@ -275,7 +271,7 @@ impl StorageCompatible for Vec<u8> {
         let mut out = 0;
 
         let status = unsafe {
-            c_wups::WUPSStorageAPI_GetItem(
+            sys::WUPSStorageAPI_GetItem(
                 core::ptr::null_mut(),
                 name.as_ptr(),
                 Self::ITEM_TYPE,
@@ -293,12 +289,12 @@ impl StorageCompatible for Vec<u8> {
     fn store(name: &str, value: Self::T) -> Result<(), StorageError> {
         let name = CString::new(name)?;
         if value.len() >= STORAGE_MAX_LENGTH {
-            return Err(StorageError::BUFFER_TOO_SMALL);
+            return Err(StorageError::BufferTooSmall);
         }
         let mut value = value;
 
         let status = unsafe {
-            c_wups::WUPSStorageAPI_StoreItem(
+            sys::WUPSStorageAPI_StoreItem(
                 core::ptr::null_mut(),
                 name.as_ptr() as *const _,
                 Self::ITEM_TYPE,
@@ -368,7 +364,7 @@ pub fn store<T: StorageCompatible>(name: &str, value: T::T) -> Result<(), Storag
 #[inline]
 pub fn delete(name: &str) -> Result<(), StorageError> {
     let name = CString::new(name)?;
-    let status = unsafe { c_wups::WUPSStorageAPI_DeleteItem(core::ptr::null_mut(), name.as_ptr()) };
+    let status = unsafe { sys::WUPSStorageAPI_DeleteItem(core::ptr::null_mut(), name.as_ptr()) };
     StorageError::try_from(status)?;
     Ok(())
 }
@@ -376,7 +372,7 @@ pub fn delete(name: &str) -> Result<(), StorageError> {
 /// Wipe the entire storage. **ALL DATA WILL BE LOST**.
 #[inline]
 pub fn reset() -> Result<(), StorageError> {
-    let status = unsafe { c_wups::WUPSStorageAPI_WipeStorage() };
+    let status = unsafe { sys::WUPSStorageAPI_WipeStorage() };
     StorageError::try_from(status)?;
     Ok(())
 }
@@ -384,7 +380,7 @@ pub fn reset() -> Result<(), StorageError> {
 /// Force a reload of the storage.
 #[inline]
 pub fn reload() -> Result<(), StorageError> {
-    let status = unsafe { c_wups::WUPSStorageAPI_ForceReloadStorage() };
+    let status = unsafe { sys::WUPSStorageAPI_ForceReloadStorage() };
     StorageError::try_from(status)?;
     Ok(())
 }
@@ -392,7 +388,7 @@ pub fn reload() -> Result<(), StorageError> {
 /// Save the storage to disk
 #[inline]
 pub fn save(force: bool) -> Result<(), StorageError> {
-    let status = unsafe { c_wups::WUPSStorageAPI_SaveStorage(force) };
+    let status = unsafe { sys::WUPSStorageAPI_SaveStorage(force) };
     StorageError::try_from(status)?;
     Ok(())
 }

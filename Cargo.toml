@@ -6,8 +6,6 @@ version = "0.3.3"
 edition = "2021"
 repository = "https://github.com/rust-wiiu/wups"
 publish = false
-build = "build.rs"
-links = "wups"
 
 [features]
 default = []
@@ -16,15 +14,11 @@ default = []
 name = "wups"
 crate-type = ["lib"]
 
-[build-dependencies]
-bindgen = "0.71.1"
-
 [profile]
 dev.panic = "abort"
 release.panic = "abort"
 
 [dependencies]
-wut = { git = "https://github.com/rust-wiiu/wut", tag = "v0.3.1" }
+wups-core = { path = "./core", version = "0.1.0" }
+wups-sys = { path = "./sys", version = "0.1.0" }
 wups-macros = { path = "./macros", version = "0.1.0" }
-flagset = { version = "0.4.6", default-features = false }
-thiserror = { version = "2.0.3", default-features = false }

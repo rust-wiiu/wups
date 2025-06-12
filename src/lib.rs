@@ -1,19 +1,10 @@
 #![no_std]
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
 
-extern crate alloc;
-extern crate flagset;
-extern crate thiserror;
-
-extern crate wups_macros;
-pub use wups_macros::*;
-
-pub mod bindings;
-pub mod config;
-pub mod storage;
+pub use wups_core::*;
+pub use wups_macros as macros;
+pub use wups_sys as sys;
 
 pub mod prelude {
-    pub use crate::config::{Attachable, ConfigMenu};
+    pub use wups_core::config::{Attachable, ConfigMenu};
+    pub use wups_macros::WUPS_PLUGIN_NAME;
 }

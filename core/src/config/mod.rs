@@ -4,79 +4,80 @@
 
 use core::ffi::CStr;
 
-use crate::{bindings as c_wups, storage};
+use crate::storage;
 use alloc::{
     ffi::{CString, NulError},
     string::{String, ToString},
     vec::Vec,
 };
 use thiserror::Error;
+use wups_sys as sys;
 
 // region: MenuError
 
 #[derive(Debug, Error)]
 pub enum MenuError {
     #[error("Unknown error")]
-    UNKNOWN(c_wups::WUPSConfigAPIStatus::Type),
+    Unknown(sys::WUPSConfigAPIStatus::Type),
     #[error("The base of the UI must be a root node.")]
-    ALREADY_INITIALIZED,
+    AlreadyInitialized,
     #[error("")]
-    INVALID_ARGUMENT,
+    InvalidArgument,
     #[error("")]
-    OUT_OF_MEMORY,
+    OutOfMemory,
     #[error("")]
-    NOT_FOUND,
+    NotFound,
     #[error("")]
-    INVALID_PLUGIN_IDENTIFIER,
+    InvalidPluginIdentifier,
     #[error("")]
-    MISSING_CALLBACK,
+    MissingCallback,
     #[error("")]
-    MODULE_NOT_FOUND,
+    ModuleNotFound,
     #[error("")]
-    MODULE_MISSING_EXPORT,
+    ModuleMissingExport,
     #[error("")]
-    UNSUPPORTED_VERSION,
+    UnsupportedVersion,
     #[error("")]
-    UNSUPPORTED_COMMAND,
+    UnsupportedCommand,
     #[error("")]
-    LIB_UNINITIALIZED,
+    LibUninitialized,
     #[error("Storage API was not initialized")]
     STORAGE(#[from] storage::StorageError),
     #[error("Internal 0-bytes")]
-    INTERNAL_NULL_BYTE(#[from] NulError),
+    InternalNullByte(#[from] NulError),
 }
 
-impl TryFrom<c_wups::WUPSConfigAPICallbackStatus::Type> for MenuError {
+impl TryFrom<sys::WUPSConfigAPICallbackStatus::Type> for MenuError {
     type Error = Self;
-    fn try_from(value: c_wups::WUPSConfigAPICallbackStatus::Type) -> Result<Self, Self::Error> {
-        use c_wups::WUPSConfigAPIStatus as E;
+    fn try_from(value: sys::WUPSConfigAPICallbackStatus::Type) -> Result<Self, Self::Error> {
+        use sys::WUPSConfigAPIStatus as E;
 
         match value {
-            E::WUPSCONFIG_API_RESULT_SUCCESS => Ok(Self::UNKNOWN(E::WUPSCONFIG_API_RESULT_SUCCESS)),
+            E::WUPSCONFIG_API_RESULT_SUCCESS => Ok(Self::Unknown(E::WUPSCONFIG_API_RESULT_SUCCESS)),
 
-            E::WUPSCONFIG_API_RESULT_INVALID_ARGUMENT => Err(Self::INVALID_ARGUMENT),
+            E::WUPSCONFIG_API_RESULT_INVALID_ARGUMENT => Err(Self::InvalidArgument),
 
-            E::WUPSCONFIG_API_RESULT_OUT_OF_MEMORY => Err(Self::OUT_OF_MEMORY),
+            E::WUPSCONFIG_API_RESULT_OUT_OF_MEMORY => Err(Self::OutOfMemory),
 
-            E::WUPSCONFIG_API_RESULT_NOT_FOUND => Err(Self::NOT_FOUND),
+            E::WUPSCONFIG_API_RESULT_NOT_FOUND => Err(Self::NotFound),
 
             E::WUPSCONFIG_API_RESULT_INVALID_PLUGIN_IDENTIFIER => {
-                Err(Self::INVALID_PLUGIN_IDENTIFIER)
+                Err(Self::InvalidPluginIdentifier)
             }
 
-            E::WUPSCONFIG_API_RESULT_MISSING_CALLBACK => Err(Self::MISSING_CALLBACK),
+            E::WUPSCONFIG_API_RESULT_MISSING_CALLBACK => Err(Self::MissingCallback),
 
-            E::WUPSCONFIG_API_RESULT_MODULE_NOT_FOUND => Err(Self::MODULE_NOT_FOUND),
+            E::WUPSCONFIG_API_RESULT_MODULE_NOT_FOUND => Err(Self::ModuleNotFound),
 
-            E::WUPSCONFIG_API_RESULT_MODULE_MISSING_EXPORT => Err(Self::MODULE_MISSING_EXPORT),
+            E::WUPSCONFIG_API_RESULT_MODULE_MISSING_EXPORT => Err(Self::ModuleMissingExport),
 
-            E::WUPSCONFIG_API_RESULT_UNSUPPORTED_VERSION => Err(Self::UNSUPPORTED_VERSION),
+            E::WUPSCONFIG_API_RESULT_UNSUPPORTED_VERSION => Err(Self::UnsupportedVersion),
 
-            E::WUPSCONFIG_API_RESULT_UNSUPPORTED_COMMAND => Err(Self::UNSUPPORTED_COMMAND),
+            E::WUPSCONFIG_API_RESULT_UNSUPPORTED_COMMAND => Err(Self::UnsupportedCommand),
 
-            E::WUPSCONFIG_API_RESULT_LIB_UNINITIALIZED => Err(Self::LIB_UNINITIALIZED),
+            E::WUPSCONFIG_API_RESULT_LIB_UNINITIALIZED => Err(Self::LibUninitialized),
 
-            v => Err(Self::UNKNOWN(v)),
+            v => Err(Self::Unknown(v)),
         }
     }
 }
@@ -104,12 +105,12 @@ pub trait ConfigMenu {
     /// **Should not be overwritten unless special control is required.**
     fn init(name: &str) -> Result<(), MenuError> {
         let name = CString::new(name).unwrap();
-        let opt = c_wups::WUPSConfigAPIOptionsV1 {
+        let opt = sys::WUPSConfigAPIOptionsV1 {
             name: name.as_ptr(),
         };
 
         let status = unsafe {
-            c_wups::WUPSConfigAPI_Init(opt, Some(Self::_open_callback), Some(Self::_close_callback))
+            sys::WUPSConfigAPI_Init(opt, Some(Self::_open_callback), Some(Self::_close_callback))
         };
         MenuError::try_from(status)?;
 
@@ -120,9 +121,9 @@ pub trait ConfigMenu {
     ///
     /// **Should not be overwritten unless special control is required.**
     extern "C" fn _open_callback(
-        root: c_wups::WUPSConfigCategoryHandle,
-    ) -> c_wups::WUPSConfigAPICallbackStatus::Type {
-        use c_wups::WUPSConfigAPICallbackStatus as S;
+        root: sys::WUPSConfigCategoryHandle,
+    ) -> sys::WUPSConfigAPICallbackStatus::Type {
+        use sys::WUPSConfigAPICallbackStatus as S;
         match Self::open(MenuRoot::from(root)) {
             Ok(_) => S::WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS,
             Err(_) => S::WUPSCONFIG_API_CALLBACK_RESULT_ERROR,
@@ -151,7 +152,7 @@ pub trait ConfigMenu {
 }
 
 pub trait MenuItem {
-    fn attach(self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError>;
+    fn attach(self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError>;
 }
 
 pub trait Attachable {
@@ -160,10 +161,10 @@ pub trait Attachable {
 
 // region: MenuRoot
 
-pub struct MenuRoot(c_wups::WUPSConfigCategoryHandle);
+pub struct MenuRoot(sys::WUPSConfigCategoryHandle);
 
-impl From<c_wups::WUPSConfigCategoryHandle> for MenuRoot {
-    fn from(value: c_wups::WUPSConfigCategoryHandle) -> Self {
+impl From<sys::WUPSConfigCategoryHandle> for MenuRoot {
+    fn from(value: sys::WUPSConfigCategoryHandle) -> Self {
         Self(value)
     }
 }
@@ -190,24 +191,24 @@ impl Attachable for MenuRoot {
 /// ```
 pub struct Menu {
     text: String,
-    handle: c_wups::WUPSConfigCategoryHandle,
+    handle: sys::WUPSConfigCategoryHandle,
 }
 
 impl Menu {
     pub fn new(text: &str) -> Result<Self, MenuError> {
-        let mut handle = c_wups::WUPSConfigCategoryHandle::default();
+        let mut handle = sys::WUPSConfigCategoryHandle::default();
         let c_text = CString::new(text).unwrap();
 
-        let opt = c_wups::WUPSConfigAPICreateCategoryOptions {
-            version: c_wups::WUPS_API_CATEGORY_OPTION_VERSION_V1,
-            data: c_wups::WUPSConfigAPICreateCategoryOptions__bindgen_ty_1 {
-                v1: c_wups::WUPSConfigAPICreateCategoryOptionsV1 {
+        let opt = sys::WUPSConfigAPICreateCategoryOptions {
+            version: sys::WUPS_API_CATEGORY_OPTION_VERSION_V1,
+            data: sys::WUPSConfigAPICreateCategoryOptions__bindgen_ty_1 {
+                v1: sys::WUPSConfigAPICreateCategoryOptionsV1 {
                     name: c_text.as_ptr(),
                 },
             },
         };
 
-        let status = unsafe { c_wups::WUPSConfigAPI_Category_CreateEx(opt, &mut handle) };
+        let status = unsafe { sys::WUPSConfigAPI_Category_CreateEx(opt, &mut handle) };
         MenuError::try_from(status)?;
 
         Ok(Self {
@@ -228,8 +229,8 @@ impl Attachable for Menu {
 }
 
 impl MenuItem for Menu {
-    fn attach(self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
-        let status = unsafe { c_wups::WUPSConfigAPI_Category_AddCategory(handle, self.handle) };
+    fn attach(self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
+        let status = unsafe { sys::WUPSConfigAPI_Category_AddCategory(handle, self.handle) };
         MenuError::try_from(status)?;
         Ok(())
     }
@@ -259,10 +260,10 @@ impl Label {
 }
 
 impl MenuItem for Label {
-    fn attach(self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
+    fn attach(self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
         let text = CString::new(self.text.as_str()).unwrap();
 
-        let status = unsafe { c_wups::WUPSConfigItemStub_AddToCategory(handle, text.as_ptr()) };
+        let status = unsafe { sys::WUPSConfigItemStub_AddToCategory(handle, text.as_ptr()) };
         MenuError::try_from(status)?;
         Ok(())
     }
@@ -293,8 +294,8 @@ pub struct Toggle {
     text: String,
     id: String,
     default: bool,
-    trueValue: String,
-    falseValue: String,
+    true_value: String,
+    false_value: String,
 }
 
 impl Toggle {
@@ -305,27 +306,27 @@ impl Toggle {
     /// - `default`: Default value if id doesn't exist in storage.
     /// - `trueValue`: Text to display when value is `true`.
     /// - `falseValue`: Text to display when value is `false`.
-    pub fn new(text: &str, id: &str, default: bool, trueValue: &str, falseValue: &str) -> Self {
+    pub fn new(text: &str, id: &str, default: bool, true_value: &str, false_value: &str) -> Self {
         Self {
             text: text.to_string(),
             id: id.to_string(),
             default,
-            trueValue: trueValue.to_string(),
-            falseValue: falseValue.to_string(),
+            true_value: true_value.to_string(),
+            false_value: false_value.to_string(),
         }
     }
 }
 
 impl MenuItem for Toggle {
-    fn attach(self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
+    fn attach(self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
         let text = CString::new(self.text.as_str()).unwrap();
         let id = CString::new(self.id.as_str()).unwrap();
-        let trueValue = CString::new(self.trueValue.as_str()).unwrap();
-        let falseValue = CString::new(self.falseValue.as_str()).unwrap();
+        let true_value = CString::new(self.true_value.as_str()).unwrap();
+        let false_value = CString::new(self.false_value.as_str()).unwrap();
 
         let current = match storage::load::<bool>(&self.id) {
             Ok(v) => v,
-            Err(storage::StorageError::NOT_FOUND) => {
+            Err(storage::StorageError::NotFound) => {
                 storage::store::<bool>(&self.id, self.default)?;
                 self.default
             }
@@ -333,15 +334,15 @@ impl MenuItem for Toggle {
         };
 
         let status = unsafe {
-            c_wups::WUPSConfigItemBoolean_AddToCategoryEx(
+            sys::WUPSConfigItemBoolean_AddToCategoryEx(
                 handle,
                 id.as_ptr(),
                 text.as_ptr(),
                 self.default,
                 current,
                 Some(_callback_toggle_changed),
-                trueValue.as_ptr(),
-                falseValue.as_ptr(),
+                true_value.as_ptr(),
+                false_value.as_ptr(),
             )
         };
         MenuError::try_from(status)?;
@@ -350,7 +351,7 @@ impl MenuItem for Toggle {
     }
 }
 
-extern "C" fn _callback_toggle_changed(item: *mut c_wups::ConfigItemBoolean, value: bool) {
+extern "C" fn _callback_toggle_changed(item: *mut sys::ConfigItemBoolean, value: bool) {
     let _ = storage::store::<bool>(
         &unsafe { CStr::from_ptr((*item).identifier) }.to_string_lossy(),
         value,
@@ -397,7 +398,7 @@ impl Range {
 }
 
 impl MenuItem for Range {
-    fn attach(self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
+    fn attach(self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
         let text = CString::new(self.text.as_str()).unwrap();
         let id = CString::new(self.id.as_str()).unwrap();
 
@@ -409,7 +410,7 @@ impl MenuItem for Range {
                     self.default
                 }
             }
-            Err(storage::StorageError::NOT_FOUND) => {
+            Err(storage::StorageError::NotFound) => {
                 storage::store::<i32>(&self.id, self.default)?;
                 self.default
             }
@@ -417,7 +418,7 @@ impl MenuItem for Range {
         };
 
         let status = unsafe {
-            c_wups::WUPSConfigItemIntegerRange_AddToCategory(
+            sys::WUPSConfigItemIntegerRange_AddToCategory(
                 handle,
                 id.as_ptr(),
                 text.as_ptr(),
@@ -434,7 +435,7 @@ impl MenuItem for Range {
     }
 }
 
-extern "C" fn _callback_range_changed(item: *mut c_wups::ConfigItemIntegerRange, value: i32) {
+extern "C" fn _callback_range_changed(item: *mut sys::ConfigItemIntegerRange, value: i32) {
     let _ = storage::store::<i32>(
         &unsafe { CStr::from_ptr((*item).identifier) }.to_string_lossy(),
         value,
@@ -445,7 +446,7 @@ extern "C" fn _callback_range_changed(item: *mut c_wups::ConfigItemIntegerRange,
 /*
 pub trait RangeCompatible {
     type T: storage::StorageCompatible<T: From<i32> + Into<i32>>;
-    extern "C" fn callback(item: *mut c_wups::ConfigItemIntegerRange, value: i32) {
+    extern "C" fn callback(item: *mut sys::ConfigItemIntegerRange, value: i32) {
         let _ = storage::store::<Self::T>(
             &unsafe { CStr::from_ptr((*item).identifier) }.to_string_lossy(),
             From::from(value),
@@ -478,7 +479,7 @@ impl<T: RangeCompatible> Range<T> {
 }
 
 impl<T: RangeCompatible> MenuItem for Range<T> {
-    fn attach(&self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
+    fn attach(&self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
         todo!()
     }
 }
@@ -524,7 +525,7 @@ impl Select {
 }
 
 impl MenuItem for Select {
-    fn attach(self, handle: c_wups::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
+    fn attach(self, handle: sys::WUPSConfigCategoryHandle) -> Result<(), MenuError> {
         let text = CString::new(self.text.as_str()).unwrap();
         let id = CString::new(self.id.as_str()).unwrap();
 
@@ -535,7 +536,7 @@ impl MenuItem for Select {
         let mut options: Vec<_> = strings
             .iter()
             .enumerate()
-            .map(|(i, s)| c_wups::ConfigItemMultipleValuesPair {
+            .map(|(i, s)| sys::ConfigItemMultipleValuesPair {
                 value: i as u32,
                 valueName: s.as_ptr(),
             })
@@ -549,7 +550,7 @@ impl MenuItem for Select {
                     self.default
                 }
             }
-            Err(storage::StorageError::NOT_FOUND) => {
+            Err(storage::StorageError::NotFound) => {
                 storage::store::<u32>(&self.id, self.default)?;
                 self.default
             }
@@ -557,7 +558,7 @@ impl MenuItem for Select {
         };
 
         let status = unsafe {
-            c_wups::WUPSConfigItemMultipleValues_AddToCategory(
+            sys::WUPSConfigItemMultipleValues_AddToCategory(
                 handle,
                 id.as_ptr(),
                 text.as_ptr(),
@@ -574,7 +575,7 @@ impl MenuItem for Select {
     }
 }
 
-extern "C" fn _callback_select_changed(item: *mut c_wups::ConfigItemMultipleValues, index: u32) {
+extern "C" fn _callback_select_changed(item: *mut sys::ConfigItemMultipleValues, index: u32) {
     let _ = storage::store::<u32>(
         &unsafe { CStr::from_ptr((*item).identifier) }.to_string_lossy(),
         index,
