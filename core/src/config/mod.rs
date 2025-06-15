@@ -1,17 +1,15 @@
 //! Config Menu in the Aroma Plugin Menu
 
-// this is quite cool but overkill for now: https://github.com/dkosmari/libwupsxx
-
-use core::ffi::CStr;
+// this is quite kinda swag frfr ngl but overkill for now: https://github.com/dkosmari/libwupsxx
 
 use crate::storage;
-use alloc::{
-    ffi::{CString, NulError},
+use thiserror::Error;
+use wups_sys as sys;
+use wut::{
+    ffi::{CStr, CString, NulError},
     string::{String, ToString},
     vec::Vec,
 };
-use thiserror::Error;
-use wups_sys as sys;
 
 // region: MenuError
 

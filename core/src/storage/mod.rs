@@ -60,15 +60,13 @@
 //! - [reset][crate::storage::reset]: Wipes the entire storage, deleting all data.
 //! - [reload][crate::storage::reload]: Forces a reload of the storage.
 
-use core::ffi;
-
-use alloc::{
-    ffi::CString,
+use thiserror::Error;
+use wups_sys as sys;
+use wut::{
+    ffi,
     string::{String, ToString},
     vec::Vec,
 };
-use thiserror::Error;
-use wups_sys as sys;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -93,7 +91,7 @@ pub enum StorageError {
     #[error("")]
     UnknownError(i32),
     #[error("CString cannot contain internal 0-bytes.")]
-    ContainsNullBytes(#[from] alloc::ffi::NulError),
+    ContainsNullBytes(#[from] ffi::NulError),
 }
 
 impl TryFrom<i32> for StorageError {
@@ -126,7 +124,7 @@ pub trait StorageCompatible {
     const ITEM_TYPE: sys::WUPSStorageItemTypes::Type;
 
     fn load(name: &str) -> Result<Self::T, StorageError> {
-        let name = CString::new(name)?;
+        let name = ffi::CString::new(name)?;
         let mut value: Self::T = Default::default();
         let mut out = 0;
 
@@ -147,7 +145,7 @@ pub trait StorageCompatible {
     }
 
     fn store(name: &str, value: Self::T) -> Result<(), StorageError> {
-        let name = CString::new(name)?;
+        let name = ffi::CString::new(name)?;
         let mut value = value;
         let status = unsafe {
             sys::WUPSStorageAPI_StoreItem(
@@ -216,7 +214,7 @@ impl StorageCompatible for String {
         sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_STRING;
 
     fn load(name: &str) -> Result<Self::T, StorageError> {
-        let name = CString::new(name)?;
+        let name = ffi::CString::new(name)?;
         let mut value = [0u8; STORAGE_MAX_LENGTH];
         let mut out = 0;
 
@@ -239,7 +237,7 @@ impl StorageCompatible for String {
     }
 
     fn store(name: &str, value: Self::T) -> Result<(), StorageError> {
-        let name = CString::new(name)?;
+        let name = ffi::CString::new(name)?;
         if value.len() >= STORAGE_MAX_LENGTH {
             return Err(StorageError::BufferTooSmall);
         }
@@ -266,7 +264,7 @@ impl StorageCompatible for Vec<u8> {
         sys::WUPSStorageItemTypes::WUPS_STORAGE_ITEM_BINARY;
 
     fn load(name: &str) -> Result<Self::T, StorageError> {
-        let name = CString::new(name)?;
+        let name = ffi::CString::new(name)?;
         let mut value = [0u8; STORAGE_MAX_LENGTH];
         let mut out = 0;
 
@@ -287,7 +285,7 @@ impl StorageCompatible for Vec<u8> {
     }
 
     fn store(name: &str, value: Self::T) -> Result<(), StorageError> {
-        let name = CString::new(name)?;
+        let name = ffi::CString::new(name)?;
         if value.len() >= STORAGE_MAX_LENGTH {
             return Err(StorageError::BufferTooSmall);
         }
@@ -363,7 +361,7 @@ pub fn store<T: StorageCompatible>(name: &str, value: T::T) -> Result<(), Storag
 /// Deletes previously saved data from storage.
 #[inline]
 pub fn delete(name: &str) -> Result<(), StorageError> {
-    let name = CString::new(name)?;
+    let name = ffi::CString::new(name)?;
     let status = unsafe { sys::WUPSStorageAPI_DeleteItem(core::ptr::null_mut(), name.as_ptr()) };
     StorageError::try_from(status)?;
     Ok(())

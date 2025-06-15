@@ -576,8 +576,8 @@ dependencies = [
 
 [[package]]
 name = "wut"
-version = "0.4.0"
-source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.0#5446cf6576582e0060b25fd2d8a64d3577f9ce79"
+version = "0.4.2"
+source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.2#cf70378d0f0964949bbf2da964636c5b08bf78fe"
 dependencies = [
  "wut-core",
  "wut-macros",
@@ -587,8 +587,8 @@ dependencies = [
 
 [[package]]
 name = "wut-core"
-version = "0.1.0"
-source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.0#5446cf6576582e0060b25fd2d8a64d3577f9ce79"
+version = "0.4.2"
+source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.2#cf70378d0f0964949bbf2da964636c5b08bf78fe"
 dependencies = [
  "flagset",
  "thiserror",
@@ -599,7 +599,7 @@ dependencies = [
 [[package]]
 name = "wut-macros"
 version = "0.1.0"
-source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.0#5446cf6576582e0060b25fd2d8a64d3577f9ce79"
+source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.2#cf70378d0f0964949bbf2da964636c5b08bf78fe"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -609,7 +609,7 @@ dependencies = [
 [[package]]
 name = "wut-math"
 version = "0.1.0"
-source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.0#5446cf6576582e0060b25fd2d8a64d3577f9ce79"
+source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.2#cf70378d0f0964949bbf2da964636c5b08bf78fe"
 dependencies = [
  "bindgen",
  "semver",
@@ -618,7 +618,7 @@ dependencies = [
 [[package]]
 name = "wut-sys"
 version = "0.1.0"
-source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.0#5446cf6576582e0060b25fd2d8a64d3577f9ce79"
+source = "git+https://github.com/rust-wiiu/wut?tag=v0.4.2#cf70378d0f0964949bbf2da964636c5b08bf78fe"
 dependencies = [
  "bindgen",
  "semver",
