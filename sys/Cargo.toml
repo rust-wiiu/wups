@@ -7,5 +7,6 @@ links = "wups"
 
 [build-dependencies]
 bindgen = "0.72.0"
+walkdir = "2.5.0"
 
 [dependencies]
