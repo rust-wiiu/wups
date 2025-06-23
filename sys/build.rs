@@ -4,7 +4,6 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/wrapper.h");
     println!("cargo:rerun-if-changed=build.rs");
 
     let link_search_path = "cargo:rustc-link-search=native";
