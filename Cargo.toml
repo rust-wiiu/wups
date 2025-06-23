@@ -2,7 +2,7 @@
 name = "wups"
 description = "Wii U Plugin System for Rust"
 license-file = "LICENSE"
-version = "0.4.2"
+version = "0.5.0"
 edition = "2024"
 repository = "https://github.com/rust-wiiu/wups"
 publish = false
@@ -19,7 +19,7 @@ dev.panic = "abort"
 release.panic = "abort"
 
 [dependencies]
-wups-core = { path = "./core", version = "0.4.2" }
+wups-core = { path = "./core", version = "0.5.0" }
 wups-sys = { path = "./sys", version = "0.1.0" }
 wups-macros = { path = "./macros", version = "0.1.0" }
 
